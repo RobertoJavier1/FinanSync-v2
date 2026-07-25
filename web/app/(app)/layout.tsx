@@ -1,0 +1,47 @@
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import { NotifProvider } from '@/context/NotifContext'
+import { FinanzasProvider } from '@/context/FinanzasContext'
+import Sidebar from '@/components/layout/Sidebar'
+
+// layout protegido: todas las rutas dentro de (app) requieren sesion activa
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    // cuando firebase termina de verificar y no hay usuario, redirige al login
+    // se espera a que loading sea false para evitar redirigir antes de tiempo
+    if (!loading && !user) {
+      router.push('/')
+    }
+  }, [user, loading, router])
+
+  // muestra pantalla de carga mientras firebase verifica la sesion
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="text-slate-500 text-sm">Cargando...</div>
+      </div>
+    )
+  }
+
+  // evita un flash del contenido protegido justo antes de la redireccion
+  if (!user) return null
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-900">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto">
+        <FinanzasProvider>
+          <NotifProvider>
+            {children}
+          </NotifProvider>
+        </FinanzasProvider>
+      </main>
+    </div>
+  )
+}

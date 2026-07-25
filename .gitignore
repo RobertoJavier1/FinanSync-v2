@@ -1,0 +1,13 @@
+*
+!.gitignore
+!web/
+!web/**
+
+web/node_modules/
+web/dist/
+web/build/
+web/.next/
+
+web/.env
+web/.env.local
+web/.DS_Store
