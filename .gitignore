@@ -1,13 +1,26 @@
-*
-!.gitignore
-!web/
-!web/**
+# Dependencies
+node_modules/
 
-web/node_modules/
-web/dist/
-web/build/
-web/.next/
+# Next.js
+.next/
+out/
 
-web/.env
-web/.env.local
-web/.DS_Store
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
