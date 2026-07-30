@@ -43,10 +43,10 @@ export default function MetasPage() {
   const [contribucionMonto, setContribucionMonto] = useState('')
   const [errorContribucion, setErrorContribucion] = useState('')
 
-  // carga las metas y transacciones del usuario desde firestore al montar el componente
+  // carga las metas y transacciones del usuario desde Supabase al montar el componente
   useEffect(() => {
     if (!user) return
-    Promise.all([getMetas(user.uid), getTransacciones(user.uid)])
+    Promise.all([getMetas(user.id), getTransacciones(user.id)])
       .then(([m, t]) => { setMetas(m); setTransactions(t) })
       .finally(() => setLoading(false))
   }, [user])
@@ -94,18 +94,17 @@ export default function MetasPage() {
     setSaving(true)
     setError('')
     try {
-      const id = await agregarMeta(user.uid, {
+      const id = await agregarMeta(user.id, {
         nombre: newNombre,
         objetivo: parseFloat(newObjetivo),
         actual: 0,
         fechaLimite: newFecha,
         colorHex: newColor,
         icono: newIcono,
-        completada: false,
         monedaOrigen: finanzas.moneda,
       })
       setMetas((prev) => [...prev, {
-        id, uid: user.uid,
+        id, uid: user.id,
         nombre: newNombre,
         objetivo: parseFloat(newObjetivo),
         actual: 0,
@@ -125,7 +124,7 @@ export default function MetasPage() {
   }
 
   async function handleEliminar(id: string) {
-    // actualiza estado local inmediatamente antes de eliminar en firestore
+    // actualiza estado local inmediatamente antes de eliminar en la base de datos
     setMetas((prev) => prev.filter((m) => m.id !== id))
     await eliminarMeta(id)
   }
@@ -158,20 +157,20 @@ export default function MetasPage() {
       return
     }
     // el usuario ingresa en su moneda actual; se convierte a la moneda origen de la meta
-    // para que el valor guardado en Firestore siempre esté en la misma unidad que el objetivo
+    // para que el valor guardado en la base de datos siempre esté en la misma unidad que el objetivo
     const montoEnMonedaOrigen = convertirEntre(monto, finanzas.moneda, contribucionMeta.monedaOrigen)
     const nuevoActual = contribucionMeta.actual + montoEnMonedaOrigen
     setMetas((prev) => prev.map((m) =>
       m.id === contribucionMeta.id
-        ? { ...m, actual: nuevoActual, completada: nuevoActual >= m.objetivo }
+        ? { ...m, actual: nuevoActual, completada: m.objetivo > 0 && nuevoActual >= m.objetivo }
         : m
     ))
-    await agregarContribucion(contribucionMeta.id, nuevoActual, contribucionMeta.objetivo)
+    await agregarContribucion(contribucionMeta.id, nuevoActual)
 
     // registrar el aporte como gasto en transacciones (igual que Android)
     // para que el saldo disponible se descuente y aparezca en el historial
     const fechaISO = new Date().toISOString().split('T')[0]
-    const txId = await agregarTransaccion(user!.uid, {
+    const txId = await agregarTransaccion(user!.id, {
       descripcion: `Aporte a la meta ${contribucionMeta.nombre}`,
       categoria: 'Ahorro',
       fechaISO,
@@ -181,7 +180,7 @@ export default function MetasPage() {
     })
     setTransactions((prev) => [{
       id: txId,
-      uid: user!.uid,
+      uid: user!.id,
       descripcion: `Aporte a la meta ${contribucionMeta.nombre}`,
       categoria: 'Ahorro',
       fecha: formatearFecha(fechaISO),

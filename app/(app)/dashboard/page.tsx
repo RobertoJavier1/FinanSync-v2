@@ -55,14 +55,14 @@ function buildCategoryData(transactions: Transaccion[], tipo: 'income' | 'expens
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
+  const { user, nombre } = useAuth()
   const { convertir, formatear } = useFinanzas()
   const [transactions, setTransactions] = useState<Transaccion[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) return
-    getTransacciones(user.uid)
+    getTransacciones(user.id)
       .then(setTransactions)
       .finally(() => setLoading(false))
   }, [user])
@@ -95,7 +95,7 @@ export default function DashboardPage() {
 
   const mesNombre = MESES[now.getMonth()]
   // muestra el primer nombre si existe, si no un saludo generico
-  const nombreUsuario = user?.displayName?.split(' ')[0] || 'de nuevo'
+  const nombreUsuario = nombre.split(' ')[0] || 'de nuevo'
 
   return (
     <div className="p-6 space-y-5 dark:bg-slate-900 min-h-screen">

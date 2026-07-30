@@ -13,14 +13,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // cuando firebase termina de verificar y no hay usuario, redirige al login
-    // se espera a que loading sea false para evitar redirigir antes de tiempo
+    // segunda línea de defensa: el middleware ya bloquea estas rutas en el
+    // servidor, pero esto cubre el caso de que la sesión expire con la app abierta
     if (!loading && !user) {
       router.push('/')
     }
   }, [user, loading, router])
 
-  // muestra pantalla de carga mientras firebase verifica la sesion
+  // muestra pantalla de carga mientras Supabase verifica la sesion
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center">

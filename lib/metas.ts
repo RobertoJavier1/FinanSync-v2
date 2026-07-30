@@ -1,15 +1,6 @@
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  updateDoc,
-  doc,
-  query,
-  where,
-  Timestamp,
-} from 'firebase/firestore'
-import { db } from './firebase'
+// Acceso a la tabla `metas` en Supabase.
+// Migrado desde la colección `metas` de Firestore (Firebase); la interfaz pública no cambia.
+import { supabase } from './supabase/client'
 
 export interface Meta {
   id: string
@@ -20,6 +11,7 @@ export interface Meta {
   fechaLimite: string   // "YYYY-MM-DD" para input date
   colorHex: string
   icono: string
+  // no es una columna: se calcula con actual >= objetivo al leer las metas
   completada: boolean
   monedaOrigen: string  // moneda activa del usuario al crear la meta
 }
@@ -32,66 +24,78 @@ export const COLORES_META = [
 
 export const ICONOS_META = ['🐷','🏠','✈️','🚗','🎓','💻','💍','🏖️','🎯','⭐']
 
-// convierte timestamp de Android (Long en ms) o Firestore Timestamp a "YYYY-MM-DD"
-function parseFechaLimite(fechaLimite: unknown): string {
-  try {
-    if (fechaLimite instanceof Timestamp) return fechaLimite.toDate().toISOString().split('T')[0]
-    if (typeof fechaLimite === 'number') return new Date(fechaLimite).toISOString().split('T')[0]
-    if (typeof fechaLimite === 'string') return fechaLimite
-  } catch { /* fallback abajo */ }
-  return ''
-}
-
 export async function getMetas(uid: string): Promise<Meta[]> {
-  // coleccion raiz con filtro por uid — misma estructura que Android
-  const q = query(collection(db, 'metas'), where('uid', '==', uid))
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => {
-    const data = d.data()
+  const { data, error } = await supabase
+    .from('metas')
+    .select('*')
+    .eq('id_usuario', uid)
+    .order('creado_en', { ascending: true })
+
+  if (error) throw error
+
+  return (data ?? []).map((row) => {
+    const objetivo = Number(row.objetivo)
+    const actual = Number(row.monto_actual)
+
     return {
-      id: d.id,
-      uid: data.uid,
-      nombre: data.nombre || '',
-      objetivo: data.objetivo || 0,
-      actual: data.actual || 0,
-      fechaLimite: parseFechaLimite(data.fechaLimite),
-      colorHex: data.colorHex || '#22c55e',
-      icono: data.icono || '🎯',
-      completada: data.completada || false,
-      monedaOrigen: data.monedaOrigen ?? 'GTQ',
+      id: row.id_meta,
+      uid: row.id_usuario,
+      nombre: row.nombre,
+      objetivo,
+      actual,
+      // la columna es nullable; la UI espera string vacío cuando no hay fecha
+      fechaLimite: row.fecha_limite ?? '',
+      colorHex: row.color,
+      icono: row.icono,
+      // derivado, no guardado: una meta sin objetivo no se considera cumplida
+      completada: objetivo > 0 && actual >= objetivo,
+      monedaOrigen: row.moneda_origen,
     }
   })
 }
 
+// `completada` no se recibe porque no es una columna: se deriva al leer.
 export async function agregarMeta(
   uid: string,
-  data: Omit<Meta, 'id' | 'uid'>
+  data: Omit<Meta, 'id' | 'uid' | 'completada'>,
 ): Promise<string> {
-  const ref = await addDoc(collection(db, 'metas'), {
-    uid,
-    nombre: data.nombre,
-    objetivo: data.objetivo,
-    actual: data.actual,
-    // fecha como Timestamp para ser compatible con el Long de Android
-    fechaLimite: data.fechaLimite ? Timestamp.fromDate(new Date(data.fechaLimite)) : null,
-    colorHex: data.colorHex,
-    icono: data.icono,
-    completada: data.completada,
-    monedaOrigen: data.monedaOrigen,
-    creadoEn: Timestamp.now(),
-  })
-  return ref.id
+  const { data: row, error } = await supabase
+    .from('metas')
+    .insert({
+      id_usuario: uid,
+      nombre: data.nombre,
+      objetivo: data.objetivo,
+      monto_actual: data.actual,
+      // un string vacío no es una fecha válida en Postgres
+      fecha_limite: data.fechaLimite || null,
+      color: data.colorHex,
+      icono: data.icono,
+      moneda_origen: data.monedaOrigen,
+    })
+    .select('id_meta')
+    .single()
+
+  if (error) throw error
+  return row.id_meta
 }
 
-export async function agregarContribucion(id: string, nuevoActual: number, objetivo: number): Promise<void> {
-  await updateDoc(doc(db, 'metas', id), {
-    actual: nuevoActual,
-    completada: nuevoActual >= objetivo,
-  })
+// `completada` no se guarda: al volver a leer la meta se recalcula desde
+// monto_actual, así que aquí basta con actualizar el monto.
+export async function agregarContribucion(
+  id: string,
+  nuevoActual: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('metas')
+    .update({ monto_actual: nuevoActual })
+    .eq('id_meta', id)
+
+  if (error) throw error
 }
 
 export async function eliminarMeta(id: string): Promise<void> {
-  await deleteDoc(doc(db, 'metas', id))
+  const { error } = await supabase.from('metas').delete().eq('id_meta', id)
+  if (error) throw error
 }
 
 // formatea "YYYY-MM-DD" → "30 dic 2026"

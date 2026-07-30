@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { User, Bell, Shield, Palette, DollarSign, Trash2, CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import { updateProfile, deleteUser, reauthenticateWithCredential, updatePassword, EmailAuthProvider } from 'firebase/auth'
-import { doc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { auth, db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase/client'
 
 // definicion de las pestanas del menu lateral de configuracion
 const tabs = [
@@ -22,7 +21,8 @@ const tabs = [
 interface Mensaje { tipo: 'ok' | 'error'; texto: string }
 
 export default function ConfiguracionPage() {
-  const { user } = useAuth()
+  const { user, nombre: nombreSesion, esGoogle } = useAuth()
+  const router = useRouter()
   const { tema, setTema } = useTheme()
   const { notif, guardar: guardarNotif } = useNotif()
   const { finanzas, guardar: guardarFinanzas } = useFinanzas()
@@ -33,19 +33,19 @@ export default function ConfiguracionPage() {
   // campos del formulario de perfil
   const [nombre, setNombre] = useState('')
 
-  // carga el nombre real del usuario desde Firebase Auth
+  // carga el nombre real del usuario desde la sesion de Supabase
   useEffect(() => {
-    if (user) setNombre(user.displayName || '')
-  }, [user])
+    setNombre(nombreSesion)
+  }, [nombreSesion])
 
-  // sincroniza los toggles locales cuando el contexto carga valores de Firestore
+  // sincroniza los toggles locales cuando el contexto carga valores de la base de datos
   useEffect(() => {
     setNotifPresupuesto(notif.presupuesto)
     setNotifMetas(notif.metas)
     setNotifIA(notif.ia)
   }, [notif.presupuesto, notif.metas, notif.ia])
 
-  // sincroniza preferencias de finanzas cuando el contexto las carga de Firestore
+  // sincroniza preferencias de finanzas cuando el contexto las carga de la base de datos
   useEffect(() => {
     setMoneda(finanzas.moneda)
     setCategorias(finanzas.categorias)
@@ -59,16 +59,26 @@ export default function ConfiguracionPage() {
   async function guardarPerfil() {
     if (!user || !nombre.trim()) return
     setSaving(true)
-    try {
-      await updateProfile(user, { displayName: nombre.trim() })
-      mostrar('ok', 'Perfil actualizado correctamente.')
-      // sincroniza con Firestore en segundo plano sin bloquear el exito
-      setDoc(doc(db, 'users', user.uid), { nombre: nombre.trim() }, { merge: true }).catch(console.error)
-    } catch {
+    const limpio = nombre.trim()
+
+    // el nombre se guarda en dos sitios: en user_metadata de la sesion (para
+    // mostrarlo sin consultar la base) y en la tabla usuarios
+    const { error: errorAuth } = await supabase.auth.updateUser({ data: { nombre: limpio } })
+    if (errorAuth) {
       mostrar('error', 'No se pudo actualizar el perfil.')
-    } finally {
       setSaving(false)
+      return
     }
+
+    const { error: errorPerfil } = await supabase
+      .from('usuarios')
+      .update({ nombre: limpio })
+      .eq('id_usuario', user.id)
+
+    if (errorPerfil) console.error(errorPerfil)
+
+    mostrar('ok', 'Perfil actualizado correctamente.')
+    setSaving(false)
   }
 
   async function eliminarCuenta() {
@@ -76,27 +86,26 @@ export default function ConfiguracionPage() {
     const confirmar = window.confirm('¿Seguro que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')
     if (!confirmar) return
     setSaving(true)
-    try {
-      // elimina todos los datos del usuario de todas las colecciones (igual que Android)
-      for (const col of ['transacciones', 'presupuestos', 'metas']) {
-        const snap = await getDocs(query(collection(db, col), where('uid', '==', user.uid)))
-        await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
-      }
-      await deleteDoc(doc(db, 'users', user.uid))
-      await deleteUser(user)
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('requires-recent-login')) {
-        mostrar('error', 'Por seguridad cierra sesión, vuelve a iniciarla y luego intenta de nuevo.')
-      } else {
-        mostrar('error', 'No se pudo eliminar la cuenta.')
-      }
-    } finally {
+
+    // borrar de auth.users exige permisos de servicio, así que se delega en la
+    // función eliminar_mi_cuenta() de Postgres, que solo puede borrar al usuario
+    // que la invoca. Las transacciones, metas, presupuestos y el perfil se van
+    // con ella por el ON DELETE CASCADE del schema.
+    const { error } = await supabase.rpc('eliminar_mi_cuenta')
+
+    if (error) {
+      mostrar('error', 'No se pudo eliminar la cuenta.')
       setSaving(false)
+      return
     }
+
+    await supabase.auth.signOut()
+    router.refresh()
+    router.push('/')
   }
 
-  // detecta si el usuario inicio sesion con Google (no tiene contrasena en Firebase)
-  const isGoogleUser = user?.providerData.some((p) => p.providerId === 'google.com') ?? false
+  // los usuarios de Google no tienen contrasena propia en Supabase
+  const isGoogleUser = esGoogle
 
   // campos del formulario de seguridad
   const [passActual, setPassActual] = useState('')
@@ -114,24 +123,39 @@ export default function ConfiguracionPage() {
       return
     }
     setSaving(true)
-    try {
-      // firebase requiere re-autenticacion reciente antes de cambiar la contrasena
-      const credential = EmailAuthProvider.credential(user.email, passActual)
-      await reauthenticateWithCredential(user, credential)
-      await updatePassword(user, passNueva)
-      mostrar('ok', 'Contraseña actualizada correctamente.')
-      setPassActual('')
-      setPassNueva('')
-      setPassConfirmar('')
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('invalid-credential')) {
-        mostrar('error', 'La contraseña actual es incorrecta.')
+
+    // updateUser no pide la contrasena actual, así que se verifica a mano
+    // haciendo un login con ella. Sin esto, cualquiera con la sesión abierta en
+    // un equipo ajeno podría cambiar la contrasena.
+    const { error: errorLogin } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: passActual,
+    })
+
+    if (errorLogin) {
+      mostrar('error', 'La contraseña actual es incorrecta.')
+      setSaving(false)
+      return
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: passNueva })
+
+    if (error) {
+      const msg = error.message.toLowerCase()
+      if (msg.includes('different from the old')) {
+        mostrar('error', 'La nueva contraseña debe ser distinta de la actual.')
       } else {
         mostrar('error', 'No se pudo cambiar la contraseña. Intenta de nuevo.')
       }
-    } finally {
       setSaving(false)
+      return
     }
+
+    mostrar('ok', 'Contraseña actualizada correctamente.')
+    setPassActual('')
+    setPassNueva('')
+    setPassConfirmar('')
+    setSaving(false)
   }
 
   const [moneda, setMoneda] = useState('GTQ')
@@ -143,6 +167,16 @@ export default function ConfiguracionPage() {
 
   // lista de categorias personalizadas con soporte para agregar y eliminar
   const [categorias, setCategorias] = useState(['Alimentación', 'Transporte', 'Entretenimiento', 'Salud', 'Educación', 'Vivienda', 'Ropa'])
+
+  // borrar una categoria no es inocuo: al guardar se van con ella los
+  // presupuestos de esa categoria, y sus transacciones quedan sin clasificar
+  function quitarCategoria(cat: string) {
+    const confirmar = window.confirm(
+      `¿Quitar la categoría "${cat}"?\n\nAl guardar se eliminarán los presupuestos de esta categoría y las transacciones que la usaban quedarán sin clasificar. El historial de montos no se pierde.`,
+    )
+    if (!confirmar) return
+    setCategorias(categorias.filter((c) => c !== cat))
+  }
   const [nuevaCategoria, setNuevaCategoria] = useState('')
   const [agregandoCategoria, setAgregandoCategoria] = useState(false)
 
@@ -331,7 +365,7 @@ export default function ConfiguracionPage() {
               )}
 
               {isGoogleUser ? (
-                // usuarios de google no tienen contrasena en firebase
+                // usuarios de google no tienen contrasena propia en supabase
                 <div className="flex flex-col items-center justify-center py-8 text-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
                     <svg className="w-6 h-6" viewBox="0 0 24 24">
@@ -474,7 +508,7 @@ export default function ConfiguracionPage() {
                       <span key={cat} className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium px-3 py-1.5 rounded-full">
                         {cat}
                         <button
-                          onClick={() => setCategorias(categorias.filter(c => c !== cat))}
+                          onClick={() => quitarCategoria(cat)}
                           className="ml-1 text-slate-400 hover:text-red-500 transition-colors leading-none"
                         >
                           ×

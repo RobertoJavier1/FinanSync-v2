@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { DollarSign } from 'lucide-react'
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -14,36 +13,47 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)  // desactiva el boton mientras espera respuesta
   const router = useRouter()
 
+  // el callback de OAuth redirige aquí con ?error=oauth si el login con Google falló.
+  // Se lee de window en lugar de useSearchParams para no obligar a envolver la
+  // página en un <Suspense> durante el prerender de Next.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('error') === 'oauth') {
+      setError('No se pudo completar el inicio de sesión con Google')
+    }
+  }, [])
+
   // login con correo y contrasena
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    try {
-      await signInWithEmailAndPassword(auth, email, password)
-      // si el login es exitoso, redirige al panel principal
-      router.push('/dashboard')
-    } catch {
-      // firebase no especifica si el error es correo o contrasena por seguridad
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      // Supabase devuelve un error genérico a propósito: no revela si el correo
+      // existe o si solo la contraseña es incorrecta
       setError('Correo o contraseña incorrectos')
-    } finally {
       setLoading(false)
+      return
     }
+    // refresh() hace que el middleware vea la cookie nueva antes de navegar
+    router.refresh()
+    router.push('/dashboard')
   }
 
-  // login con cuenta de google usando popup
+  // login con cuenta de google (redirect OAuth, se resuelve en /auth/callback)
   async function handleGoogle() {
     setError('')
     setLoading(true)
-    try {
-      const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
-      router.push('/dashboard')
-    } catch {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (error) {
       setError('Error al iniciar sesión con Google')
-    } finally {
       setLoading(false)
     }
+    // si no hay error el navegador ya se está yendo a Google; no se resetea
+    // loading para que el botón siga deshabilitado durante la redirección
   }
 
   return (

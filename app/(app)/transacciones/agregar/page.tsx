@@ -35,7 +35,7 @@ export default function AgregarTransaccionPage() {
     setError('')
     try {
       // si no hay descripcion se usa la categoria como nombre de la transaccion
-      await agregarTransaccion(user.uid, {
+      await agregarTransaccion(user.id, {
         descripcion: description.trim() || category,
         categoria: category,
         fechaISO: date,

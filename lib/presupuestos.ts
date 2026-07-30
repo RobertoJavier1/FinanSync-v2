@@ -1,20 +1,15 @@
-import {
-  collection,
-  addDoc,
-  getDocs,
-  deleteDoc,
-  doc,
-  query,
-  where,
-  Timestamp,
-} from 'firebase/firestore'
-import { db } from './firebase'
+// Acceso a la tabla `presupuestos` en Supabase.
+//
+// La interfaz pública no cambia: las páginas siguen viendo `categoria` como
+// texto y `limiteMonthly`, aunque en la base sean id_categoria y limite_mensual.
+import { supabase } from './supabase/client'
+import { getCategorias, asegurarCategoria } from './categorias'
 
 export interface Presupuesto {
   id: string
   uid: string
   categoria: string
-  limiteMonthly: number   // campo que usa Android para el limite mensual
+  limiteMonthly: number   // limite mensual de gasto
   mes: number             // mes numerico (1-12)
   anio: number
   colorHex: string
@@ -32,34 +27,79 @@ export const COLORES_PRESUPUESTO = [
 // iconos predefinidos para cada presupuesto
 export const ICONOS_PRESUPUESTO = ['🏠','🍽️','🚗','🛍️','🎬','💊','📚','💡','✈️','📋']
 
-export async function getPresupuestos(uid: string, mes: number, anio: number): Promise<Presupuesto[]> {
-  // filtra por uid, mes y anio para obtener solo los presupuestos del mes actual
-  const q = query(
-    collection(db, 'presupuestos'),
-    where('uid', '==', uid),
-    where('mes', '==', mes),
-    where('anio', '==', anio)
-  )
-  const snap = await getDocs(q)
-  return snap.docs.map((d) => {
-    const data = d.data()
-    return { id: d.id, ...data, monedaOrigen: data.monedaOrigen ?? 'GTQ' } as Presupuesto
-  })
+export async function getPresupuestos(
+  uid: string,
+  mes: number,
+  anio: number,
+): Promise<Presupuesto[]> {
+  // filtra por usuario, mes y anio para traer solo el periodo que se muestra
+  const [respuesta, categorias] = await Promise.all([
+    supabase
+      .from('presupuestos')
+      .select('*')
+      .eq('id_usuario', uid)
+      .eq('mes', mes)
+      .eq('anio', anio),
+    getCategorias(uid),
+  ])
+
+  if (respuesta.error) throw respuesta.error
+
+  const nombrePorId = new Map(categorias.map((c) => [c.id, c.nombre]))
+
+  return (respuesta.data ?? []).map((row) => ({
+    id: row.id_presupuesto,
+    uid: row.id_usuario,
+    // id_categoria es NOT NULL y borrar la categoría se lleva el presupuesto
+    // (ON DELETE CASCADE), así que aquí el nombre siempre debería existir
+    categoria: nombrePorId.get(row.id_categoria) ?? '',
+    limiteMonthly: Number(row.limite_mensual),
+    mes: row.mes,
+    anio: row.anio,
+    colorHex: row.color,
+    icono: row.icono,
+    monedaOrigen: row.moneda_origen,
+  }))
 }
 
 export async function agregarPresupuesto(
   uid: string,
-  data: Omit<Presupuesto, 'id' | 'uid' | 'spent'>
+  data: Omit<Presupuesto, 'id' | 'uid' | 'spent'>,
 ): Promise<string> {
-  // guarda en coleccion raiz con uid — misma estructura que Android
-  const ref = await addDoc(collection(db, 'presupuestos'), {
-    uid,
-    ...data,
-    creadoEn: Timestamp.now(),
-  })
-  return ref.id
+  const idCategoria = await asegurarCategoria(uid, data.categoria)
+
+  const { data: row, error } = await supabase
+    .from('presupuestos')
+    .insert({
+      id_usuario: uid,
+      id_categoria: idCategoria,
+      limite_mensual: data.limiteMonthly,
+      mes: data.mes,
+      anio: data.anio,
+      color: data.colorHex,
+      icono: data.icono,
+      moneda_origen: data.monedaOrigen,
+    })
+    .select('id_presupuesto')
+    .single()
+
+  // 23505 = unique_violation: ya hay un presupuesto de esa categoría ese mes
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(`Ya tienes un presupuesto de "${data.categoria}" para ese mes.`)
+    }
+    throw error
+  }
+
+  return row.id_presupuesto
 }
 
 export async function eliminarPresupuesto(id: string): Promise<void> {
-  await deleteDoc(doc(db, 'presupuestos', id))
+  // RLS ya impide borrar filas de otro usuario, así que no hace falta pasar el uid
+  const { error } = await supabase
+    .from('presupuestos')
+    .delete()
+    .eq('id_presupuesto', id)
+
+  if (error) throw error
 }

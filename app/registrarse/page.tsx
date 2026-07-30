@@ -4,9 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { DollarSign } from 'lucide-react'
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
-import { auth, db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase/client'
 
 export default function RegisterPage() {
   const [nombre, setNombre] = useState('')
@@ -21,46 +19,50 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
 
-    // validaciones del lado del cliente antes de llamar a firebase
+    // validaciones del lado del cliente antes de llamar a Supabase
     if (password !== confirmar) {
       setError('Las contraseñas no coinciden')
       return
     }
 
-    // firebase requiere minimo 6 caracteres, se valida antes para dar mejor mensaje
+    // Supabase exige minimo 6 caracteres, se valida antes para dar mejor mensaje
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres')
       return
     }
 
     setLoading(true)
-    try {
-      // paso 1: crear el usuario en firebase auth con correo y contrasena
-      const { user } = await createUserWithEmailAndPassword(auth, email, password)
 
-      // paso 2: guardar el nombre en el perfil de firebase auth
-      // esto permite mostrar el nombre en la app sin consultar firestore
-      await updateProfile(user, { displayName: nombre })
+    // el nombre viaja en user_metadata; el trigger handle_new_user() de la base
+    // de datos lo copia a la tabla profiles, así que ya no hay que insertar el
+    // perfil a mano desde el cliente
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { nombre } },
+    })
 
-      // paso 3: guardar datos adicionales en firestore
-      // se usa el uid como id del documento para relacionarlo con el usuario
-      await setDoc(doc(db, 'users', user.uid), {
-        nombre,
-        email,
-        creadoEn: new Date().toISOString(),
-      })
-
-      router.push('/dashboard')
-    } catch (err: unknown) {
-      // se detecta el error especifico de correo duplicado para dar mejor feedback
-      if (err instanceof Error && err.message.includes('email-already-in-use')) {
+    if (signUpError) {
+      const msg = signUpError.message.toLowerCase()
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
         setError('Este correo ya está registrado')
       } else {
         setError('Error al crear la cuenta. Intenta de nuevo.')
       }
-    } finally {
       setLoading(false)
+      return
     }
+
+    // si en Supabase está activada la confirmación por correo, signUp no
+    // devuelve sesión: el usuario debe abrir el enlace antes de poder entrar
+    if (!data.session) {
+      setError('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.')
+      setLoading(false)
+      return
+    }
+
+    router.refresh()
+    router.push('/dashboard')
   }
 
   return (

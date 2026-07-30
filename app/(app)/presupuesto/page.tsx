@@ -39,8 +39,8 @@ export default function PresupuestoPage() {
   useEffect(() => {
     if (!user) return
     Promise.all([
-      getPresupuestos(user.uid, mes, anio),
-      getTransacciones(user.uid),
+      getPresupuestos(user.id, mes, anio),
+      getTransacciones(user.id),
     ]).then(([p, t]) => {
       setPresupuestos(p)
       setTransacciones(t)
@@ -84,7 +84,7 @@ export default function PresupuestoPage() {
     setSaving(true)
     setError('')
     try {
-      const id = await agregarPresupuesto(user.uid, {
+      const id = await agregarPresupuesto(user.id, {
         categoria: newCategoria,
         limiteMonthly: parseFloat(newLimite),
         mes,
@@ -96,7 +96,7 @@ export default function PresupuestoPage() {
       // agrega el nuevo presupuesto al estado local sin recargar todo
       setPresupuestos((prev) => [...prev, {
         id,
-        uid: user.uid,
+        uid: user.id,
         categoria: newCategoria,
         limiteMonthly: parseFloat(newLimite),
         mes,
@@ -115,7 +115,7 @@ export default function PresupuestoPage() {
   }
 
   async function handleEliminar(id: string) {
-    // actualiza el estado local inmediatamente antes de eliminar en firestore
+    // actualiza el estado local inmediatamente antes de eliminar en la base de datos
     setPresupuestos((prev) => prev.filter((p) => p.id !== id))
     await eliminarPresupuesto(id)
   }

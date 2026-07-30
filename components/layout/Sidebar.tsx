@@ -13,8 +13,8 @@ import {
   LogOut,
   DollarSign,
 } from 'lucide-react'
-import { signOut } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase/client'
 
 // lista de rutas principales que aparecen en el menu de navegacion
 const navItems = [
@@ -29,11 +29,14 @@ const navItems = [
 export default function Sidebar() {
   // usePathname devuelve la ruta actual para saber que item del menu esta activo
   const pathname = usePathname()
+  const router = useRouter()
 
-  // cierra la sesion del usuario en Firebase y redirige al login automaticamente
-  // el AuthContext detecta el cambio y el layout protegido redirige al login
+  // cierra la sesion en Supabase y borra la cookie; refresh() avisa al
+  // middleware del cambio y push() lleva al login
   async function handleLogout() {
-    await signOut(auth)
+    await supabase.auth.signOut()
+    router.refresh()
+    router.push('/')
   }
 
   return (

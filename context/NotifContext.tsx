@@ -1,9 +1,8 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { useAuth } from './AuthContext'
-import { db } from '@/lib/firebase'
+import { supabase } from '@/lib/supabase/client'
 
 // preferencias de notificaciones del usuario
 export interface NotifState {
@@ -15,11 +14,11 @@ export interface NotifState {
 // funciones y datos que el contexto expone a todas las paginas
 interface NotifContextValue {
   notif: NotifState
-  notifLoaded: boolean  // true cuando ya se cargaron las preferencias desde Firestore
+  notifLoaded: boolean  // true cuando ya se cargaron las preferencias desde la base de datos
   guardar: (vals: NotifState) => Promise<void>
 }
 
-// valor por defecto: todas las notificaciones activas antes de cargar Firestore
+// valor por defecto: todas las notificaciones activas antes de cargar el perfil
 const NotifContext = createContext<NotifContextValue>({
   notif: { presupuesto: true, metas: true, ia: true },
   notifLoaded: false,
@@ -31,32 +30,42 @@ export function NotifProvider({ children }: { children: React.ReactNode }) {
   const [notif, setNotif] = useState<NotifState>({ presupuesto: true, metas: true, ia: true })
   const [notifLoaded, setNotifLoaded] = useState(false)
 
-  // carga las preferencias de notificaciones del usuario desde Firestore
+  // carga las preferencias de notificaciones del usuario desde usuarios
   useEffect(() => {
     if (!user) return
-    getDoc(doc(db, 'users', user.uid))
-      .then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data()
+    supabase
+      .from('usuarios')
+      .select('notif_presupuesto, notif_metas, notif_ia')
+      .eq('id_usuario', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.error(error)
+        if (data) {
           setNotif({
-            presupuesto: d.notifPresupuesto ?? true,
-            metas: d.notifMetas ?? true,
-            ia: d.notifIA ?? true,
+            presupuesto: data.notif_presupuesto ?? true,
+            metas: data.notif_metas ?? true,
+            ia: data.notif_ia ?? true,
           })
         }
+        setNotifLoaded(true)
       })
-      .finally(() => setNotifLoaded(true))
   }, [user])
 
-  // guarda las preferencias en el estado local y en Firestore simultaneamente
+  // guarda las preferencias en el estado local y en usuarios simultaneamente
   async function guardar(vals: NotifState) {
     if (!user) return
     setNotif(vals)
-    await setDoc(
-      doc(db, 'users', user.uid),
-      { notifPresupuesto: vals.presupuesto, notifMetas: vals.metas, notifIA: vals.ia },
-      { merge: true }, // merge:true para no sobreescribir otros campos del documento
-    )
+    // solo se actualizan estas tres columnas; las de finanzas no se tocan
+    const { error } = await supabase
+      .from('usuarios')
+      .update({
+        notif_presupuesto: vals.presupuesto,
+        notif_metas: vals.metas,
+        notif_ia: vals.ia,
+      })
+      .eq('id_usuario', user.id)
+
+    if (error) throw error
   }
 
   return (

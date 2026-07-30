@@ -36,7 +36,7 @@ const SUGERENCIAS = [
 ]
 
 export default function ChatIAPage() {
-  const { user } = useAuth()
+  const { user, nombre: nombreUsuario } = useAuth()
   const { finanzas, convertir } = useFinanzas()
   const [contexto, setContexto] = useState<ContextoFinanciero | null>(null)
   const [cargandoContexto, setCargandoContexto] = useState(true)
@@ -46,7 +46,7 @@ export default function ChatIAPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // carga los datos reales del usuario desde Firestore al montar
+  // carga los datos reales del usuario desde Supabase al montar
   useEffect(() => {
     if (!user) return
 
@@ -58,9 +58,9 @@ export default function ChatIAPage() {
         const mesStr = `${MESES[mes - 1]} ${anio}`
 
         const [transacciones, presupuestos, metas] = await Promise.all([
-          getTransacciones(user!.uid),
-          getPresupuestos(user!.uid, mes, anio),
-          getMetas(user!.uid),
+          getTransacciones(user!.id),
+          getPresupuestos(user!.id, mes, anio),
+          getMetas(user!.id),
         ])
 
         // filtra solo transacciones del mes actual
@@ -101,7 +101,7 @@ export default function ChatIAPage() {
         })
 
         const ctx: ContextoFinanciero = {
-          nombre: user!.displayName || 'Usuario',
+          nombre: nombreUsuario || 'Usuario',
           mes: mesStr,
           moneda: finanzas.moneda,
           ingresosMes,
@@ -185,7 +185,7 @@ export default function ChatIAPage() {
   }
 
 
-  // pantalla de carga mientras obtiene datos de Firestore
+  // pantalla de carga mientras obtiene datos de Supabase
   if (cargandoContexto) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-slate-100 dark:bg-slate-900 gap-4">
@@ -194,7 +194,7 @@ export default function ChatIAPage() {
         </div>
         <div className="text-center">
           <p className="font-semibold text-slate-700 dark:text-slate-200">Cargando tu información financiera...</p>
-          <p className="text-sm text-slate-400 mt-1">Conectando con Firestore</p>
+          <p className="text-sm text-slate-400 mt-1">Conectando con Supabase</p>
         </div>
         <Loader2 className="w-5 h-5 text-green-500 animate-spin" />
       </div>

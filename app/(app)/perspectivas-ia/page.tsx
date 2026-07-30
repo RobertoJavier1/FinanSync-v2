@@ -89,9 +89,9 @@ export default function PerspectivasIAPage() {
   useEffect(() => {
     if (!user) return
     Promise.all([
-      getTransacciones(user.uid),
-      getPresupuestos(user.uid, mes, anio),
-      getMetas(user.uid),
+      getTransacciones(user.id),
+      getPresupuestos(user.id, mes, anio),
+      getMetas(user.id),
     ]).then(([t, p, m]) => {
       setTransactions(t)
       setPresupuestos(p)

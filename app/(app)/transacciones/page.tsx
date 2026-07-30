@@ -16,23 +16,23 @@ export default function TransaccionesPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  // carga las transacciones del usuario desde firestore al montar el componente
+  // carga las transacciones del usuario desde Supabase al montar el componente
   useEffect(() => {
     if (!user) return
     setLoading(true)
-    getTransacciones(user.uid)
+    getTransacciones(user.id)
       .then(setTransactions)
       .finally(() => setLoading(false))
   }, [user])
 
-  // actualiza el estado local inmediatamente para respuesta instantanea, luego elimina en firestore
+  // actualiza el estado local inmediatamente para respuesta instantanea, luego elimina en la base de datos
   async function handleEliminar(id: string) {
     if (!user) return
     setTransactions((prev) => prev.filter((t) => t.id !== id))
-    await eliminarTransaccion(user.uid, id)
+    await eliminarTransaccion(user.id, id)
   }
 
-  // aplica los tres filtros en simultaneo sobre la lista cargada de firestore
+  // aplica los tres filtros en simultaneo sobre la lista cargada desde Supabase
   const filtered = transactions.filter((t) => {
     const matchSearch = t.descripcion.toLowerCase().includes(search.toLowerCase())
     const matchType = typeFilter === 'all' || t.tipo === typeFilter
