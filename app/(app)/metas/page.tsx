@@ -13,14 +13,17 @@ import {
   getMetas, agregarMeta, eliminarMeta, agregarContribucion,
   Meta, COLORES_META, ICONOS_META, formatearFechaMeta, diasRestantes,
 } from '@/lib/metas'
-import { getTransacciones, agregarTransaccion, formatearFecha, Transaccion } from '@/lib/transacciones'
+import { agregarTransaccion } from '@/lib/transacciones'
+import { useTransacciones } from '@/hooks/useTransacciones'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function MetasPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir, convertirEntre } = useFinanzas()
   const [metas, setMetas] = useState<Meta[]>([])
-  const [transactions, setTransactions] = useState<Transaccion[]>([])
+  const { data: transactions = [] } = useTransacciones(user?.id)
+  const queryClient = useQueryClient()
   const [bannersCerrados, setBannersCerrados] = useState<Set<string>>(new Set())
 
   function cerrarBanner(key: string) {
@@ -43,11 +46,12 @@ export default function MetasPage() {
   const [contribucionMonto, setContribucionMonto] = useState('')
   const [errorContribucion, setErrorContribucion] = useState('')
 
-  // carga las metas y transacciones del usuario desde Supabase al montar el componente
+  // carga las metas del usuario desde Supabase al montar el componente; las
+  // transacciones vienen de la cache compartida via useTransacciones
   useEffect(() => {
     if (!user) return
-    Promise.all([getMetas(user.id), getTransacciones(user.id)])
-      .then(([m, t]) => { setMetas(m); setTransactions(t) })
+    getMetas(user.id)
+      .then(setMetas)
       .finally(() => setLoading(false))
   }, [user])
 
@@ -170,7 +174,7 @@ export default function MetasPage() {
     // registrar el aporte como gasto en transacciones (igual que Android)
     // para que el saldo disponible se descuente y aparezca en el historial
     const fechaISO = new Date().toISOString().split('T')[0]
-    const txId = await agregarTransaccion(user!.id, {
+    await agregarTransaccion(user!.id, {
       descripcion: `Aporte a la meta ${contribucionMeta.nombre}`,
       categoria: 'Ahorro',
       fechaISO,
@@ -178,17 +182,7 @@ export default function MetasPage() {
       tipo: 'expense',
       monedaOrigen: finanzas.moneda,
     })
-    setTransactions((prev) => [{
-      id: txId,
-      uid: user!.id,
-      descripcion: `Aporte a la meta ${contribucionMeta.nombre}`,
-      categoria: 'Ahorro',
-      fecha: formatearFecha(fechaISO),
-      fechaISO,
-      monto,
-      tipo: 'expense',
-      monedaOrigen: finanzas.moneda,
-    }, ...prev])
+    queryClient.invalidateQueries({ queryKey: ['transacciones', user!.id] })
 
     setContribucionMeta(null)
     setContribucionMonto('')

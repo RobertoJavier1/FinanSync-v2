@@ -1,35 +1,28 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Search, Trash2, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { getTransacciones, eliminarTransaccion, Transaccion } from '@/lib/transacciones'
+import { useTransacciones } from '@/hooks/useTransacciones'
+import { useQueryClient } from '@tanstack/react-query'
+import { eliminarTransaccion } from '@/lib/transacciones'
 
 export default function TransaccionesPage() {
   const { user } = useAuth()
   const { formatear, convertir, finanzas } = useFinanzas()
-  const [transactions, setTransactions] = useState<Transaccion[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: transactions = [], isLoading: loading } = useTransacciones(user?.id)
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  // carga las transacciones del usuario desde Supabase al montar el componente
-  useEffect(() => {
-    if (!user) return
-    setLoading(true)
-    getTransacciones(user.id)
-      .then(setTransactions)
-      .finally(() => setLoading(false))
-  }, [user])
-
-  // actualiza el estado local inmediatamente para respuesta instantanea, luego elimina en la base de datos
+  // elimina en la base de datos y le avisa al cache que ese usuario debe refrescar sus transacciones
   async function handleEliminar(id: string) {
     if (!user) return
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
     await eliminarTransaccion(user.id, id)
+    queryClient.invalidateQueries({ queryKey: ['transacciones', user.id] })
   }
 
   // aplica los tres filtros en simultaneo sobre la lista cargada desde Supabase

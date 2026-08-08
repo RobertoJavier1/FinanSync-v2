@@ -10,7 +10,8 @@ import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { getTransacciones, Transaccion } from '@/lib/transacciones'
+import { useTransacciones } from '@/hooks/useTransacciones'
+import type { Transaccion } from '@/lib/transacciones'
 import { getPresupuestos, Presupuesto } from '@/lib/presupuestos'
 import { getMetas, Meta, diasRestantes } from '@/lib/metas'
 
@@ -72,10 +73,12 @@ export default function PerspectivasIAPage() {
   const { finanzas, convertir, formatear } = useFinanzas()
   const isDark = tema === 'oscuro'
 
-  const [transactions, setTransactions] = useState<Transaccion[]>([])
+  const { data: transactions = [], isLoading: loadingTransacciones } = useTransacciones(user?.id)
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [metas, setMetas] = useState<Meta[]>([])
   const [loadingData, setLoadingData] = useState(true)
+  // combina la carga de presupuestos/metas (local) con la de transacciones (cache compartida)
+  const cargando = loadingData || loadingTransacciones
   const [perspectivas, setPerspectivas] = useState<Perspectiva[]>([])
   const [loadingIA, setLoadingIA] = useState(false)
   const [errorIA, setErrorIA] = useState('')
@@ -85,15 +88,13 @@ export default function PerspectivasIAPage() {
   const anio = now.getFullYear()
   const mesActual = `${anio}-${String(mes).padStart(2, '0')}`
 
-  // carga en paralelo transacciones, presupuestos y metas del usuario al montar
+  // carga presupuestos y metas del usuario al montar; las transacciones vienen de la cache compartida
   useEffect(() => {
     if (!user) return
     Promise.all([
-      getTransacciones(user.id),
       getPresupuestos(user.id, mes, anio),
       getMetas(user.id),
-    ]).then(([t, p, m]) => {
-      setTransactions(t)
+    ]).then(([p, m]) => {
       setPresupuestos(p)
       setMetas(m)
     }).finally(() => setLoadingData(false))
@@ -158,7 +159,7 @@ export default function PerspectivasIAPage() {
   const chartAxisColor = isDark ? '#64748b' : '#94a3b8'
 
   // no hay nada registrado cuando las tres fuentes estan vacias
-  const sinDatos = !loadingData && transactions.length === 0 && presupuestos.length === 0 && metas.length === 0
+  const sinDatos = !cargando && transactions.length === 0 && presupuestos.length === 0 && metas.length === 0
 
   // llama a la API route que consulta gemini y devuelve las perspectivas generadas
   async function cargarPerspectivas() {
@@ -189,10 +190,10 @@ export default function PerspectivasIAPage() {
 
   // dispara la carga automatica solo cuando hay datos y el usuario tiene las recomendaciones IA activadas
   useEffect(() => {
-    if (!loadingData && !sinDatos && notifLoaded && notif.ia) {
+    if (!cargando && !sinDatos && notifLoaded && notif.ia) {
       cargarPerspectivas()
     }
-  }, [loadingData, notifLoaded, sinDatos, notif.ia])
+  }, [cargando, notifLoaded, sinDatos, notif.ia])
 
   // porcentaje de variacion entre el primer y ultimo mes del grafico de tendencia
   const variacionGastos = useMemo(() => {
@@ -317,7 +318,7 @@ export default function PerspectivasIAPage() {
             {notif.ia && (
               <button
                 onClick={cargarPerspectivas}
-                disabled={loadingIA || loadingData}
+                disabled={loadingIA || cargando}
                 className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
               >
                 <RefreshCw className={`w-3 h-3 ${loadingIA ? 'animate-spin' : ''}`} />

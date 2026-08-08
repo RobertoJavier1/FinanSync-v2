@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import { ThemeProvider } from '@/context/ThemeContext'
+import {Providers} from './providers'
 
 // fuente inter cargada desde google fonts, solo el subconjunto latin para reducir peso
 const inter = Inter({ subsets: ['latin'] })
@@ -23,9 +24,11 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         {/* AuthProvider envuelve todo para que cualquier pagina pueda acceder al estado de sesion */}
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ThemeProvider>
+        </Providers>
       </body>
     </html>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -9,7 +9,8 @@ import {
 import { TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { getTransacciones, Transaccion } from '@/lib/transacciones'
+import { useTransacciones } from '@/hooks/useTransacciones'
+import type { Transaccion } from '@/lib/transacciones'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -57,15 +58,7 @@ function buildCategoryData(transactions: Transaccion[], tipo: 'income' | 'expens
 export default function DashboardPage() {
   const { user, nombre } = useAuth()
   const { convertir, formatear } = useFinanzas()
-  const [transactions, setTransactions] = useState<Transaccion[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!user) return
-    getTransacciones(user.id)
-      .then(setTransactions)
-      .finally(() => setLoading(false))
-  }, [user])
+  const { data: transactions = [], isLoading: loading } = useTransacciones(user?.id)
 
   const now = new Date()
   // prefijo del mes actual para filtrar transacciones de este mes

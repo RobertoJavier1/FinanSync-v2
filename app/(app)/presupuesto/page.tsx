@@ -10,7 +10,7 @@ const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
 }
 import { getPresupuestos, agregarPresupuesto, eliminarPresupuesto, Presupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
-import { getTransacciones, Transaccion } from '@/lib/transacciones'
+import { useTransacciones } from '@/hooks/useTransacciones'
 
 export default function PresupuestoPage() {
   const { user } = useAuth()
@@ -18,7 +18,7 @@ export default function PresupuestoPage() {
   const { finanzas, formatear, convertir } = useFinanzas()
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
   const [bannerCerrado, setBannerCerrado] = useState(false)
-  const [transacciones, setTransacciones] = useState<Transaccion[]>([])
+  const { data: transacciones = [] } = useTransacciones(user?.id)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -35,16 +35,12 @@ export default function PresupuestoPage() {
   const anio = now.getFullYear()
   const mesStr = `${anio}-${String(mes).padStart(2, '0')}`
 
-  // carga presupuestos del mes actual y transacciones en paralelo
+  // carga presupuestos del mes actual; las transacciones vienen de la cache compartida
   useEffect(() => {
     if (!user) return
-    Promise.all([
-      getPresupuestos(user.id, mes, anio),
-      getTransacciones(user.id),
-    ]).then(([p, t]) => {
-      setPresupuestos(p)
-      setTransacciones(t)
-    }).finally(() => setLoading(false))
+    getPresupuestos(user.id, mes, anio)
+      .then(setPresupuestos)
+      .finally(() => setLoading(false))
   }, [user, mes, anio])
 
   // calcula el gasto real de cada categoria convirtiendo cada transaccion a la moneda actual

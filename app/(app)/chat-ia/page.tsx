@@ -5,6 +5,7 @@ import { Send, Bot, User, Sparkles, RotateCcw, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { useQueryClient } from '@tanstack/react-query'
 import { getTransacciones } from '@/lib/transacciones'
 import { getPresupuestos } from '@/lib/presupuestos'
 import { getMetas, diasRestantes } from '@/lib/metas'
@@ -38,6 +39,7 @@ const SUGERENCIAS = [
 export default function ChatIAPage() {
   const { user, nombre: nombreUsuario } = useAuth()
   const { finanzas, convertir } = useFinanzas()
+  const queryClient = useQueryClient()
   const [contexto, setContexto] = useState<ContextoFinanciero | null>(null)
   const [cargandoContexto, setCargandoContexto] = useState(true)
   const [messages, setMessages] = useState<Message[]>([])
@@ -58,7 +60,10 @@ export default function ChatIAPage() {
         const mesStr = `${MESES[mes - 1]} ${anio}`
 
         const [transacciones, presupuestos, metas] = await Promise.all([
-          getTransacciones(user!.id),
+          queryClient.fetchQuery({
+            queryKey: ['transacciones', user!.id],
+            queryFn: () => getTransacciones(user!.id),
+          }),
           getPresupuestos(user!.id, mes, anio),
           getMetas(user!.id),
         ])
