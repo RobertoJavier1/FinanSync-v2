@@ -12,8 +12,9 @@ import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
 import { useTransacciones } from '@/hooks/useTransacciones'
 import type { Transaccion } from '@/lib/transacciones'
-import { getPresupuestos, Presupuesto } from '@/lib/presupuestos'
-import { getMetas, Meta, diasRestantes } from '@/lib/metas'
+import { usePresupuestos } from '@/hooks/usePresupuestos'
+import { useMetas } from '@/hooks/useMetas'
+import { diasRestantes } from '@/lib/metas'
 
 // abreviaturas de meses para los ejes de las graficas
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -73,32 +74,19 @@ export default function PerspectivasIAPage() {
   const { finanzas, convertir, formatear } = useFinanzas()
   const isDark = tema === 'oscuro'
 
-  const { data: transactions = [], isLoading: loadingTransacciones } = useTransacciones(user?.id)
-  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
-  const [metas, setMetas] = useState<Meta[]>([])
-  const [loadingData, setLoadingData] = useState(true)
-  // combina la carga de presupuestos/metas (local) con la de transacciones (cache compartida)
-  const cargando = loadingData || loadingTransacciones
-  const [perspectivas, setPerspectivas] = useState<Perspectiva[]>([])
-  const [loadingIA, setLoadingIA] = useState(false)
-  const [errorIA, setErrorIA] = useState('')
-
   const now = new Date()
   const mes = now.getMonth() + 1
   const anio = now.getFullYear()
   const mesActual = `${anio}-${String(mes).padStart(2, '0')}`
 
-  // carga presupuestos y metas del usuario al montar; las transacciones vienen de la cache compartida
-  useEffect(() => {
-    if (!user) return
-    Promise.all([
-      getPresupuestos(user.id, mes, anio),
-      getMetas(user.id),
-    ]).then(([p, m]) => {
-      setPresupuestos(p)
-      setMetas(m)
-    }).finally(() => setLoadingData(false))
-  }, [user])
+  const { data: transactions = [], isLoading: loadingTransacciones } = useTransacciones(user?.id)
+  const { data: presupuestos = [], isLoading: loadingPresupuestos } = usePresupuestos(user?.id, mes, anio)
+  const { data: metas = [], isLoading: loadingMetas } = useMetas(user?.id)
+  // combina la carga de las tres fuentes, cada una con su propia cache
+  const cargando = loadingTransacciones || loadingPresupuestos || loadingMetas
+  const [perspectivas, setPerspectivas] = useState<Perspectiva[]>([])
+  const [loadingIA, setLoadingIA] = useState(false)
+  const [errorIA, setErrorIA] = useState('')
 
   // totales del mes actual convertidos a la moneda preferida del usuario
   const ingresosMes = useMemo(() =>

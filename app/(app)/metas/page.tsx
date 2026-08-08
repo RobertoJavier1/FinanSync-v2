@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Plus, Calendar, X, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotif } from '@/context/NotifContext'
@@ -10,18 +10,19 @@ const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
 }
 import {
-  getMetas, agregarMeta, eliminarMeta, agregarContribucion,
+  agregarMeta, eliminarMeta, agregarContribucion,
   Meta, COLORES_META, ICONOS_META, formatearFechaMeta, diasRestantes,
 } from '@/lib/metas'
 import { agregarTransaccion } from '@/lib/transacciones'
 import { useTransacciones } from '@/hooks/useTransacciones'
+import { useMetas } from '@/hooks/useMetas'
 import { useQueryClient } from '@tanstack/react-query'
 
 export default function MetasPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir, convertirEntre } = useFinanzas()
-  const [metas, setMetas] = useState<Meta[]>([])
+  const { data: metas = [], isLoading: loading } = useMetas(user?.id)
   const { data: transactions = [] } = useTransacciones(user?.id)
   const queryClient = useQueryClient()
   const [bannersCerrados, setBannersCerrados] = useState<Set<string>>(new Set())
@@ -29,7 +30,6 @@ export default function MetasPage() {
   function cerrarBanner(key: string) {
     setBannersCerrados((prev) => new Set(prev).add(key))
   }
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -45,15 +45,6 @@ export default function MetasPage() {
   const [contribucionMeta, setContribucionMeta] = useState<Meta | null>(null)
   const [contribucionMonto, setContribucionMonto] = useState('')
   const [errorContribucion, setErrorContribucion] = useState('')
-
-  // carga las metas del usuario desde Supabase al montar el componente; las
-  // transacciones vienen de la cache compartida via useTransacciones
-  useEffect(() => {
-    if (!user) return
-    getMetas(user.id)
-      .then(setMetas)
-      .finally(() => setLoading(false))
-  }, [user])
 
   const mesActual = useMemo(() => {
     const now = new Date()
@@ -98,7 +89,7 @@ export default function MetasPage() {
     setSaving(true)
     setError('')
     try {
-      const id = await agregarMeta(user.id, {
+      await agregarMeta(user.id, {
         nombre: newNombre,
         objetivo: parseFloat(newObjetivo),
         actual: 0,
@@ -107,17 +98,7 @@ export default function MetasPage() {
         icono: newIcono,
         monedaOrigen: finanzas.moneda,
       })
-      setMetas((prev) => [...prev, {
-        id, uid: user.id,
-        nombre: newNombre,
-        objetivo: parseFloat(newObjetivo),
-        actual: 0,
-        fechaLimite: newFecha,
-        colorHex: newColor,
-        icono: newIcono,
-        completada: false,
-        monedaOrigen: finanzas.moneda,
-      }])
+      queryClient.invalidateQueries({ queryKey: ['metas', user.id] })
       setShowModal(false)
       resetModal()
     } catch {
@@ -128,9 +109,9 @@ export default function MetasPage() {
   }
 
   async function handleEliminar(id: string) {
-    // actualiza estado local inmediatamente antes de eliminar en la base de datos
-    setMetas((prev) => prev.filter((m) => m.id !== id))
+    if (!user) return
     await eliminarMeta(id)
+    queryClient.invalidateQueries({ queryKey: ['metas', user.id] })
   }
 
   async function handleContribucion() {
@@ -164,12 +145,8 @@ export default function MetasPage() {
     // para que el valor guardado en la base de datos siempre esté en la misma unidad que el objetivo
     const montoEnMonedaOrigen = convertirEntre(monto, finanzas.moneda, contribucionMeta.monedaOrigen)
     const nuevoActual = contribucionMeta.actual + montoEnMonedaOrigen
-    setMetas((prev) => prev.map((m) =>
-      m.id === contribucionMeta.id
-        ? { ...m, actual: nuevoActual, completada: m.objetivo > 0 && nuevoActual >= m.objetivo }
-        : m
-    ))
     await agregarContribucion(contribucionMeta.id, nuevoActual)
+    queryClient.invalidateQueries({ queryKey: ['metas', user!.id] })
 
     // registrar el aporte como gasto en transacciones (igual que Android)
     // para que el saldo disponible se descuente y aparezca en el historial

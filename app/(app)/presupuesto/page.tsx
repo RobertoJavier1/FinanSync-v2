@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Plus, Trash2, X, TrendingDown, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotif } from '@/context/NotifContext'
@@ -9,17 +9,24 @@ import { useFinanzas } from '@/context/FinanzasContext'
 const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
 }
-import { getPresupuestos, agregarPresupuesto, eliminarPresupuesto, Presupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
+import { agregarPresupuesto, eliminarPresupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
 import { useTransacciones } from '@/hooks/useTransacciones'
+import { usePresupuestos } from '@/hooks/usePresupuestos'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function PresupuestoPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir } = useFinanzas()
-  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([])
-  const [bannerCerrado, setBannerCerrado] = useState(false)
+  const now = new Date()
+  const mes = now.getMonth() + 1   // getMonth() devuelve 0-11
+  const anio = now.getFullYear()
+  const mesStr = `${anio}-${String(mes).padStart(2, '0')}`
+
+  const { data: presupuestos = [], isLoading: loading } = usePresupuestos(user?.id, mes, anio)
   const { data: transacciones = [] } = useTransacciones(user?.id)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const [bannerCerrado, setBannerCerrado] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -29,19 +36,6 @@ export default function PresupuestoPage() {
   const [newLimite, setNewLimite] = useState('')
   const [newColor, setNewColor] = useState(COLORES_PRESUPUESTO[0])
   const [newIcono, setNewIcono] = useState(ICONOS_PRESUPUESTO[0])
-
-  const now = new Date()
-  const mes = now.getMonth() + 1   // getMonth() devuelve 0-11
-  const anio = now.getFullYear()
-  const mesStr = `${anio}-${String(mes).padStart(2, '0')}`
-
-  // carga presupuestos del mes actual; las transacciones vienen de la cache compartida
-  useEffect(() => {
-    if (!user) return
-    getPresupuestos(user.id, mes, anio)
-      .then(setPresupuestos)
-      .finally(() => setLoading(false))
-  }, [user, mes, anio])
 
   // calcula el gasto real de cada categoria convirtiendo cada transaccion a la moneda actual
   const presupuestosConGasto = useMemo(() => {
@@ -80,7 +74,7 @@ export default function PresupuestoPage() {
     setSaving(true)
     setError('')
     try {
-      const id = await agregarPresupuesto(user.id, {
+      await agregarPresupuesto(user.id, {
         categoria: newCategoria,
         limiteMonthly: parseFloat(newLimite),
         mes,
@@ -89,18 +83,7 @@ export default function PresupuestoPage() {
         icono: newIcono,
         monedaOrigen: finanzas.moneda,
       })
-      // agrega el nuevo presupuesto al estado local sin recargar todo
-      setPresupuestos((prev) => [...prev, {
-        id,
-        uid: user.id,
-        categoria: newCategoria,
-        limiteMonthly: parseFloat(newLimite),
-        mes,
-        anio,
-        colorHex: newColor,
-        icono: newIcono,
-        monedaOrigen: finanzas.moneda,
-      }])
+      queryClient.invalidateQueries({ queryKey: ['presupuestos', user.id, mes, anio] })
       setShowModal(false)
       resetModal()
     } catch {
@@ -111,9 +94,9 @@ export default function PresupuestoPage() {
   }
 
   async function handleEliminar(id: string) {
-    // actualiza el estado local inmediatamente antes de eliminar en la base de datos
-    setPresupuestos((prev) => prev.filter((p) => p.id !== id))
+    if (!user) return
     await eliminarPresupuesto(id)
+    queryClient.invalidateQueries({ queryKey: ['presupuestos', user.id, mes, anio] })
   }
 
   return (

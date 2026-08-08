@@ -64,8 +64,14 @@ export default function ChatIAPage() {
             queryKey: ['transacciones', user!.id],
             queryFn: () => getTransacciones(user!.id),
           }),
-          getPresupuestos(user!.id, mes, anio),
-          getMetas(user!.id),
+          queryClient.fetchQuery({
+            queryKey: ['presupuestos', user!.id, mes, anio],
+            queryFn: () => getPresupuestos(user!.id, mes, anio),
+          }),
+          queryClient.fetchQuery({
+            queryKey: ['metas', user!.id],
+            queryFn: () => getMetas(user!.id),
+          }),
         ])
 
         // filtra solo transacciones del mes actual
