@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -84,9 +85,6 @@ export default function PerspectivasIAPage() {
   const { data: metas = [], isLoading: loadingMetas } = useMetas(user?.id)
   // combina la carga de las tres fuentes, cada una con su propia cache
   const cargando = loadingTransacciones || loadingPresupuestos || loadingMetas
-  const [perspectivas, setPerspectivas] = useState<Perspectiva[]>([])
-  const [loadingIA, setLoadingIA] = useState(false)
-  const [errorIA, setErrorIA] = useState('')
 
   // totales del mes actual convertidos a la moneda preferida del usuario
   const ingresosMes = useMemo(() =>
@@ -149,39 +147,41 @@ export default function PerspectivasIAPage() {
   // no hay nada registrado cuando las tres fuentes estan vacias
   const sinDatos = !cargando && transactions.length === 0 && presupuestos.length === 0 && metas.length === 0
 
-  // llama a la API route que consulta gemini y devuelve las perspectivas generadas
-  async function cargarPerspectivas() {
-    setLoadingIA(true)
-    setErrorIA('')
-    try {
+  // payload que se le manda a gemini; su contenido serializado es la "huella" que identifica si algo cambio
+  const payloadIA = useMemo(() => ({
+    ingresos: ingresosMes,
+    gastos: gastosMes,
+    categorias: categoriasMes,
+    presupuestos: presupuestosConGasto,
+    metas: metasResumen,
+    moneda: finanzas.moneda,
+  }), [ingresosMes, gastosMes, categoriasMes, presupuestosConGasto, metasResumen, finanzas.moneda])
+
+  // la query solo se re-ejecuta cuando cambia la huella de payloadIA; mientras los datos sean
+  // los mismos, react-query reusa el resultado ya generado en vez de volver a llamar a gemini
+  const {
+    data: perspectivas = [],
+    isFetching: loadingIA,
+    isError: hayErrorIA,
+    refetch: cargarPerspectivas,
+  } = useQuery({
+    queryKey: ['perspectivas', user?.id, JSON.stringify(payloadIA)],
+    queryFn: async () => {
       const res = await fetch('/api/perspectivas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingresos: ingresosMes,
-          gastos: gastosMes,
-          categorias: categoriasMes,
-          presupuestos: presupuestosConGasto,
-          metas: metasResumen,
-          moneda: finanzas.moneda,
-        }),
+        body: JSON.stringify(payloadIA),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setPerspectivas(data.perspectivas)
-    } catch {
-      setErrorIA('No se pudieron cargar las perspectivas. Intenta de nuevo.')
-    } finally {
-      setLoadingIA(false)
-    }
-  }
-
-  // dispara la carga automatica solo cuando hay datos y el usuario tiene las recomendaciones IA activadas
-  useEffect(() => {
-    if (!cargando && !sinDatos && notifLoaded && notif.ia) {
-      cargarPerspectivas()
-    }
-  }, [cargando, notifLoaded, sinDatos, notif.ia])
+      return data.perspectivas as Perspectiva[]
+    },
+    enabled: !cargando && !sinDatos && notifLoaded && notif.ia,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  })
+  const errorIA = hayErrorIA ? 'No se pudieron cargar las perspectivas. Intenta de nuevo.' : ''
 
   // porcentaje de variacion entre el primer y ultimo mes del grafico de tendencia
   const variacionGastos = useMemo(() => {
@@ -305,7 +305,7 @@ export default function PerspectivasIAPage() {
             <h2 className="font-semibold text-slate-800 dark:text-slate-100">Perspectivas Personalizadas</h2>
             {notif.ia && (
               <button
-                onClick={cargarPerspectivas}
+                onClick={() => cargarPerspectivas()}
                 disabled={loadingIA || cargando}
                 className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
               >
