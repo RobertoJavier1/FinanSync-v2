@@ -1,15 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowDownLeft, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { useTransacciones } from '@/hooks/useTransacciones'
+import { useTransacciones, useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import type { Transaccion } from '@/lib/transacciones'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -58,65 +58,106 @@ function buildCategoryData(transactions: Transaccion[], tipo: 'income' | 'expens
 export default function DashboardPage() {
   const { user, nombre } = useAuth()
   const { convertir, formatear } = useFinanzas()
-  const { data: transactions = [], isLoading: loading } = useTransacciones(user?.id)
 
-  const now = new Date()
-  // prefijo del mes actual para filtrar transacciones de este mes
-  const mesActual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const hoy = new Date()
+  // mes que se esta viendo en el dashboard (1-12), por defecto el actual
+  const [mesSeleccionado, setMesSeleccionado] = useState({ mes: hoy.getMonth() + 1, anio: hoy.getFullYear() })
+  const esMesActual = mesSeleccionado.mes === hoy.getMonth() + 1 && mesSeleccionado.anio === hoy.getFullYear()
+
+  function mesAnterior() {
+    setMesSeleccionado(({ mes, anio }) =>
+      mes === 1 ? { mes: 12, anio: anio - 1 } : { mes: mes - 1, anio })
+  }
+
+  function mesSiguiente() {
+    if (esMesActual) return // no tiene sentido navegar a un mes que no ha empezado
+    setMesSeleccionado(({ mes, anio }) =>
+      mes === 12 ? { mes: 1, anio: anio + 1 } : { mes: mes + 1, anio })
+  }
+
+  // historial completo: solo lo usan el Saldo Total y la grafica de 6 meses
+  const { data: historial = [] } = useTransacciones(user?.id)
+  // transacciones del mes que se esta viendo: tarjetas, pie charts y ultimos movimientos
+  const { data: transactionsMes = [], isLoading: loading } = useTransaccionesPorMes(user?.id, mesSeleccionado.mes, mesSeleccionado.anio)
 
   const ingresosMes = useMemo(() =>
-    transactions
-      .filter((t) => t.tipo === 'income' && t.fechaISO?.startsWith(mesActual))
+    transactionsMes
+      .filter((t) => t.tipo === 'income')
       .reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0),
-    [transactions, mesActual, convertir])
+    [transactionsMes, convertir])
 
   const gastosMes = useMemo(() =>
-    transactions
-      .filter((t) => t.tipo === 'expense' && t.fechaISO?.startsWith(mesActual))
+    transactionsMes
+      .filter((t) => t.tipo === 'expense')
       .reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0),
-    [transactions, mesActual, convertir])
+    [transactionsMes, convertir])
+
+  // balance del mes que se esta viendo (a diferencia del saldo total, este si cambia con el selector)
+  const saldoMes = ingresosMes - gastosMes
 
   // saldo = suma de todos los ingresos menos todos los gastos historicos
   const saldoTotal = useMemo(() =>
-    transactions.filter((t) => t.tipo === 'income').reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0) -
-    transactions.filter((t) => t.tipo === 'expense').reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0),
-    [transactions, convertir])
+    historial.filter((t) => t.tipo === 'income').reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0) -
+    historial.filter((t) => t.tipo === 'expense').reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0),
+    [historial, convertir])
 
-  const monthlyData   = useMemo(() => buildMonthlyData(transactions, convertir), [transactions, convertir])
-  const gastoData     = useMemo(() => buildCategoryData(transactions, 'expense', convertir), [transactions, convertir])
-  const ingresoData   = useMemo(() => buildCategoryData(transactions, 'income', convertir), [transactions, convertir])
+  const monthlyData   = useMemo(() => buildMonthlyData(historial, convertir), [historial, convertir])
+  const gastoData     = useMemo(() => buildCategoryData(transactionsMes, 'expense', convertir), [transactionsMes, convertir])
+  const ingresoData   = useMemo(() => buildCategoryData(transactionsMes, 'income', convertir), [transactionsMes, convertir])
 
-  const mesNombre = MESES[now.getMonth()]
+  const mesNombre = MESES[mesSeleccionado.mes - 1]
   // muestra el primer nombre si existe, si no un saludo generico
   const nombreUsuario = nombre.split(' ')[0] || 'de nuevo'
 
   return (
     <div className="p-6 space-y-5 dark:bg-slate-900 min-h-screen">
-      {/* encabezado con nombre real del usuario y mes actual */}
+      {/* encabezado con nombre real del usuario y selector de mes */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">¡Bienvenido, {nombreUsuario}! 👋</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-            Aquí está tu resumen financiero de {mesNombre} {now.getFullYear()}
+            Aquí está tu resumen financiero de {mesNombre} {mesSeleccionado.anio}
           </p>
         </div>
-        <Link href="/transacciones/agregar">
-          <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
-            <Plus className="w-4 h-4" />
-            Agregar Transacción
-          </button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-1.5 py-1.5">
+            <button
+              onClick={mesAnterior}
+              aria-label="Mes anterior"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-28 text-center">
+              {mesNombre} {mesSeleccionado.anio}
+            </span>
+            <button
+              onClick={mesSiguiente}
+              disabled={esMesActual}
+              aria-label="Mes siguiente"
+              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+          <Link href="/transacciones/agregar">
+            <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
+              <Plus className="w-4 h-4" />
+              Agregar Transacción
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* tarjetas de resumen: muestra skeleton mientras carga */}
       {loading ? (
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-5 animate-pulse h-28" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="bg-green-600 text-white rounded-xl p-5">
             <p className="text-green-100 text-xs mb-1">Saldo Total</p>
             <p className="text-3xl font-bold">
@@ -131,6 +172,22 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <div className="bg-blue-600 text-white rounded-xl p-5">
+            <p className="text-blue-100 text-xs mb-1">Saldo del Mes</p>
+            <p className="text-3xl font-bold">
+              {formatear(saldoMes)}
+            </p>
+            <p className="text-blue-200 text-xs mt-2 flex items-center gap-1">
+              {saldoMes >= 0
+                ? <TrendingUp className="w-3 h-3" />
+                : <TrendingDown className="w-3 h-3" />}
+              {esMesActual ? 'Este mes' : mesNombre}
+            </p>
+            <div className="w-8 h-8 bg-blue-500 rounded-lg mt-3 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-white" />
+            </div>
+          </div>
+
           <div className="bg-white dark:bg-slate-800 rounded-xl p-5">
             <div className="flex justify-between items-start">
               <div>
@@ -138,7 +195,7 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold text-slate-800 dark:text-white">
                   {formatear(ingresosMes)}
                 </p>
-                <p className="text-slate-400 text-xs mt-1">Este mes</p>
+                <p className="text-slate-400 text-xs mt-1">{esMesActual ? 'Este mes' : mesNombre}</p>
               </div>
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
                 <ArrowUpRight className="w-4 h-4 text-green-600" />
@@ -153,7 +210,7 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold text-slate-800 dark:text-white">
                   {formatear(gastosMes)}
                 </p>
-                <p className="text-slate-400 text-xs mt-1">Este mes</p>
+                <p className="text-slate-400 text-xs mt-1">{esMesActual ? 'Este mes' : mesNombre}</p>
               </div>
               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
                 <ArrowDownLeft className="w-4 h-4 text-red-500" />
@@ -264,7 +321,9 @@ export default function DashboardPage() {
       {/* ultimas 4 transacciones como vista rapida antes de ir a la pagina completa */}
       <div className="bg-white dark:bg-slate-800 rounded-xl p-5">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Últimas Transacciones</h2>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
+            {esMesActual ? 'Últimas Transacciones' : `Transacciones de ${mesNombre}`}
+          </h2>
           <Link href="/transacciones">
             <button className="text-xs text-blue-600 border border-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors font-medium">
               Ver Todo
@@ -273,11 +332,11 @@ export default function DashboardPage() {
         </div>
         {loading ? (
           <div className="text-slate-400 text-sm text-center py-4">Cargando...</div>
-        ) : transactions.length === 0 ? (
-          <div className="text-slate-400 text-sm text-center py-4">No hay transacciones aún</div>
+        ) : transactionsMes.length === 0 ? (
+          <div className="text-slate-400 text-sm text-center py-4">No hay transacciones en este mes</div>
         ) : (
           <div className="space-y-3">
-            {transactions.slice(0, 4).map((t) => (
+            {transactionsMes.slice(0, 4).map((t) => (
               <div key={t.id} className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${t.tipo === 'income' ? 'bg-green-100' : 'bg-red-100'}`}>
                   {t.tipo === 'income'
