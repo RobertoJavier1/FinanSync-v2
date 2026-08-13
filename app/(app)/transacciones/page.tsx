@@ -5,20 +5,24 @@ import Link from 'next/link'
 import { Search, Trash2, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { useTransacciones } from '@/hooks/useTransacciones'
+import { usePeriodo } from '@/context/PeriodoContext'
+import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { useQueryClient } from '@tanstack/react-query'
 import { eliminarTransaccion } from '@/lib/transacciones'
+import SelectorMes from '@/components/SelectorMes'
 
 export default function TransaccionesPage() {
   const { user } = useAuth()
   const { formatear, convertir, finanzas } = useFinanzas()
-  const { data: transactions = [], isLoading: loading } = useTransacciones(user?.id)
+  const { mes, anio, mesNombre } = usePeriodo()
+  const { data: transactions = [], isLoading: loading } = useTransaccionesPorMes(user?.id, mes, anio)
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  // elimina en la base de datos y le avisa al cache que ese usuario debe refrescar sus transacciones
+  // elimina en la base de datos y le avisa al cache que ese usuario debe refrescar sus transacciones.
+  // el prefijo ['transacciones', user.id] invalida tambien la version por mes (['transacciones', user.id, mes, anio])
   async function handleEliminar(id: string) {
     if (!user) return
     await eliminarTransaccion(user.id, id)
@@ -51,14 +55,17 @@ export default function TransaccionesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Transacciones</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Visualiza y administra tus transacciones</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Visualiza y administra tus transacciones de {mesNombre}</p>
         </div>
-        <Link href="/transacciones/agregar">
-          <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
-            <Plus className="w-4 h-4" />
-            Agregar Transacción
-          </button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <SelectorMes />
+          <Link href="/transacciones/agregar">
+            <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
+              <Plus className="w-4 h-4" />
+              Agregar Transacción
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -99,7 +106,7 @@ export default function TransaccionesPage() {
         <div className="text-center py-12 text-slate-400 text-sm">Cargando transacciones...</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-slate-400 text-sm">
-          {transactions.length === 0 ? 'Aún no tienes transacciones. ¡Agrega la primera!' : 'No hay transacciones que coincidan con los filtros.'}
+          {transactions.length === 0 ? `No tienes transacciones en ${mesNombre}.` : 'No hay transacciones que coincidan con los filtros.'}
         </div>
       ) : (
         <div className="space-y-2">

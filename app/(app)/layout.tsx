@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { NotifProvider } from '@/context/NotifContext'
 import { FinanzasProvider } from '@/context/FinanzasContext'
+import { PeriodoProvider } from '@/context/PeriodoContext'
 import Sidebar from '@/components/layout/Sidebar'
 
 // layout protegido: todas las rutas dentro de (app) requieren sesion activa
@@ -37,9 +38,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <FinanzasProvider>
-          <NotifProvider>
-            {children}
-          </NotifProvider>
+          <PeriodoProvider>
+            <NotifProvider>
+              {children}
+            </NotifProvider>
+          </PeriodoProvider>
         </FinanzasProvider>
       </main>
     </div>

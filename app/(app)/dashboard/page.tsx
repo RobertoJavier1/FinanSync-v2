@@ -1,18 +1,18 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowDownLeft, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { usePeriodo, MESES } from '@/context/PeriodoContext'
 import { useTransacciones, useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import type { Transaccion } from '@/lib/transacciones'
-
-const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+import SelectorMes from '@/components/SelectorMes'
 
 // colores asignados por categoria para las graficas
 const PIE_COLORS: Record<string, string> = {
@@ -59,26 +59,12 @@ export default function DashboardPage() {
   const { user, nombre } = useAuth()
   const { convertir, formatear } = useFinanzas()
 
-  const hoy = new Date()
-  // mes que se esta viendo en el dashboard (1-12), por defecto el actual
-  const [mesSeleccionado, setMesSeleccionado] = useState({ mes: hoy.getMonth() + 1, anio: hoy.getFullYear() })
-  const esMesActual = mesSeleccionado.mes === hoy.getMonth() + 1 && mesSeleccionado.anio === hoy.getFullYear()
-
-  function mesAnterior() {
-    setMesSeleccionado(({ mes, anio }) =>
-      mes === 1 ? { mes: 12, anio: anio - 1 } : { mes: mes - 1, anio })
-  }
-
-  function mesSiguiente() {
-    if (esMesActual) return // no tiene sentido navegar a un mes que no ha empezado
-    setMesSeleccionado(({ mes, anio }) =>
-      mes === 12 ? { mes: 1, anio: anio + 1 } : { mes: mes + 1, anio })
-  }
+  const { mes, anio, mesNombre, esMesActual } = usePeriodo()
 
   // historial completo: solo lo usan el Saldo Total y la grafica de 6 meses
   const { data: historial = [] } = useTransacciones(user?.id)
   // transacciones del mes que se esta viendo: tarjetas, pie charts y ultimos movimientos
-  const { data: transactionsMes = [], isLoading: loading } = useTransaccionesPorMes(user?.id, mesSeleccionado.mes, mesSeleccionado.anio)
+  const { data: transactionsMes = [], isLoading: loading } = useTransaccionesPorMes(user?.id, mes, anio)
 
   const ingresosMes = useMemo(() =>
     transactionsMes
@@ -105,7 +91,6 @@ export default function DashboardPage() {
   const gastoData     = useMemo(() => buildCategoryData(transactionsMes, 'expense', convertir), [transactionsMes, convertir])
   const ingresoData   = useMemo(() => buildCategoryData(transactionsMes, 'income', convertir), [transactionsMes, convertir])
 
-  const mesNombre = MESES[mesSeleccionado.mes - 1]
   // muestra el primer nombre si existe, si no un saludo generico
   const nombreUsuario = nombre.split(' ')[0] || 'de nuevo'
 
@@ -116,30 +101,11 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">¡Bienvenido, {nombreUsuario}! 👋</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
-            Aquí está tu resumen financiero de {mesNombre} {mesSeleccionado.anio}
+            Aquí está tu resumen financiero de {mesNombre} {anio}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-1.5 py-1.5">
-            <button
-              onClick={mesAnterior}
-              aria-label="Mes anterior"
-              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 w-28 text-center">
-              {mesNombre} {mesSeleccionado.anio}
-            </span>
-            <button
-              onClick={mesSiguiente}
-              disabled={esMesActual}
-              aria-label="Mes siguiente"
-              className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-300 disabled:opacity-30 disabled:hover:bg-transparent"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <SelectorMes />
           <Link href="/transacciones/agregar">
             <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
               <Plus className="w-4 h-4" />

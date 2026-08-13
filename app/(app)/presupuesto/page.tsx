@@ -5,26 +5,26 @@ import { Plus, Trash2, X, TrendingDown, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { usePeriodo } from '@/context/PeriodoContext'
 
 const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
 }
 import { agregarPresupuesto, eliminarPresupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
-import { useTransacciones } from '@/hooks/useTransacciones'
+import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { usePresupuestos } from '@/hooks/usePresupuestos'
 import { useQueryClient } from '@tanstack/react-query'
+import SelectorMes from '@/components/SelectorMes'
 
 export default function PresupuestoPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir } = useFinanzas()
-  const now = new Date()
-  const mes = now.getMonth() + 1   // getMonth() devuelve 0-11
-  const anio = now.getFullYear()
-  const mesStr = `${anio}-${String(mes).padStart(2, '0')}`
+  const { mes, anio, mesNombre } = usePeriodo()
 
   const { data: presupuestos = [], isLoading: loading } = usePresupuestos(user?.id, mes, anio)
-  const { data: transacciones = [] } = useTransacciones(user?.id)
+  // ya viene filtrado por el mismo mes/anio, no hace falta filtrar por fecha otra vez
+  const { data: transacciones = [] } = useTransaccionesPorMes(user?.id, mes, anio)
   const queryClient = useQueryClient()
   const [bannerCerrado, setBannerCerrado] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -41,15 +41,11 @@ export default function PresupuestoPage() {
   const presupuestosConGasto = useMemo(() => {
     return presupuestos.map((p) => {
       const spent = transacciones
-        .filter((t) =>
-          t.tipo === 'expense' &&
-          t.categoria.toLowerCase() === p.categoria.toLowerCase() &&
-          t.fechaISO?.startsWith(mesStr)
-        )
+        .filter((t) => t.tipo === 'expense' && t.categoria.toLowerCase() === p.categoria.toLowerCase())
         .reduce((s, t) => s + convertir(t.monto, t.monedaOrigen), 0)
       return { ...p, spent }
     })
-  }, [presupuestos, transacciones, mesStr, convertir])
+  }, [presupuestos, transacciones, convertir])
 
   // totales para la tarjeta de resumen superior
   const totalBudget = presupuestosConGasto.reduce((s, p) => s + convertir(p.limiteMonthly, p.monedaOrigen), 0)
@@ -105,15 +101,18 @@ export default function PresupuestoPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Gestión de Presupuestos</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Rastrea y administra tus presupuestos mensuales</p>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Rastrea y administra tus presupuestos de {mesNombre}</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Crear Presupuesto
-        </button>
+        <div className="flex items-center gap-3">
+          <SelectorMes />
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Crear Presupuesto
+          </button>
+        </div>
       </div>
 
       {/* Banner de alerta cuando hay presupuestos en riesgo (≥80%) */}
@@ -179,7 +178,7 @@ export default function PresupuestoPage() {
         </div>
       ) : presupuestosConGasto.length === 0 ? (
         <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-sm">
-          No tienes presupuestos para este mes. ¡Crea el primero!
+          No tienes presupuestos para {mesNombre}. ¡Crea el primero!
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
