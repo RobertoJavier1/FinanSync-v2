@@ -22,6 +22,22 @@ export interface Transaccion {
   monedaOrigen: string  // moneda activa del usuario al crear la transaccion
 }
 
+// une las filas de la tabla con los nombres de categoria ya resueltos
+function mapearFilas(filas: any[], nombrePorId: Map<string, string>): Transaccion[] {
+  return filas.map((row) => ({
+    id: row.id_transaccion,
+    uid: row.id_usuario,
+    descripcion: row.descripcion,
+    categoria: (row.id_categoria && nombrePorId.get(row.id_categoria)) || SIN_CATEGORIA,
+    fecha: formatearFecha(row.fecha),
+    fechaISO: row.fecha,
+    // numeric de Postgres puede llegar como string por precisión; Number lo normaliza
+    monto: Number(row.monto),
+    tipo: row.tipo,
+    monedaOrigen: row.moneda_origen,
+  }))
+}
+
 export async function getTransacciones(uid: string): Promise<Transaccion[]> {
   // dos consultas en paralelo en lugar de un join: la lista de categorías es
   // corta y así el tipado se mantiene simple
@@ -39,19 +55,35 @@ export async function getTransacciones(uid: string): Promise<Transaccion[]> {
   if (respuesta.error) throw respuesta.error
 
   const nombrePorId = new Map(categorias.map((c) => [c.id, c.nombre]))
+  return mapearFilas(respuesta.data ?? [], nombrePorId)
+}
 
-  return (respuesta.data ?? []).map((row) => ({
-    id: row.id_transaccion,
-    uid: row.id_usuario,
-    descripcion: row.descripcion,
-    categoria: (row.id_categoria && nombrePorId.get(row.id_categoria)) || SIN_CATEGORIA,
-    fecha: formatearFecha(row.fecha),
-    fechaISO: row.fecha,
-    // numeric de Postgres puede llegar como string por precisión; Number lo normaliza
-    monto: Number(row.monto),
-    tipo: row.tipo,
-    monedaOrigen: row.moneda_origen,
-  }))
+export async function getTransaccionesPorMes(
+  uid: string,
+  mes: number,   // 1-12
+  anio: number,
+): Promise<Transaccion[]> {
+  // rango [inicio, fin) para no depender de cuantos dias tiene el mes
+  const inicio = `${anio}-${String(mes).padStart(2, '0')}-01`
+  const finMes = mes === 12 ? 1 : mes + 1
+  const finAnio = mes === 12 ? anio + 1 : anio
+  const fin = `${finAnio}-${String(finMes).padStart(2, '0')}-01`
+
+  const [respuesta, categorias] = await Promise.all([
+    supabase
+      .from('transacciones')
+      .select('*')
+      .eq('id_usuario', uid)
+      .gte('fecha', inicio)
+      .lt('fecha', fin)
+      .order('fecha', { ascending: false }),
+    getCategorias(uid),
+  ])
+
+  if (respuesta.error) throw respuesta.error
+
+  const nombrePorId = new Map(categorias.map((c) => [c.id, c.nombre]))
+  return mapearFilas(respuesta.data ?? [], nombrePorId)
 }
 
 export async function agregarTransaccion(
