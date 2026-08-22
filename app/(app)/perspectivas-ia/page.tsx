@@ -192,10 +192,10 @@ export default function PerspectivasIAPage() {
   }, [trendData])
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           ✨ Perspectivas Financieras IA
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Recomendaciones personalizadas impulsadas por análisis de IA</p>
