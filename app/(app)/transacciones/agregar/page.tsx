@@ -52,9 +52,9 @@ export default function AgregarTransaccionPage() {
   }
 
   return (
-    <div className="p-6 dark:bg-slate-900 min-h-screen">
+    <div className="p-4 md:p-6 dark:bg-slate-900 min-h-screen">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-3 mb-6 md:mb-8">
         <Link href="/transacciones">
           <button className="text-slate-600 hover:text-slate-800 transition-colors">
             <ChevronLeft className="w-6 h-6" />
@@ -64,7 +64,7 @@ export default function AgregarTransaccionPage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleGuardar} className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-xl p-8 space-y-6">
+      <form onSubmit={handleGuardar} className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-8 space-y-6">
         {/* Type Toggle */}
         <div>
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipo de Transacción</p>
