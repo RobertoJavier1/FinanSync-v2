@@ -236,7 +236,7 @@ export default function PerspectivasIAPage() {
       </div>
 
       {/* Gráficas */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-5">
           <h2 className="font-semibold text-slate-800 dark:text-slate-100 text-sm mb-4">Tendencia de Gastos de 6 Meses</h2>
           <ResponsiveContainer width="100%" height={160}>
