@@ -96,18 +96,18 @@ export default function PresupuestoPage() {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Gestión de Presupuestos</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Rastrea y administra tus presupuestos de {mesNombre}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 sm:justify-start shrink-0">
           <SelectorMes />
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm"
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             Crear Presupuesto
@@ -140,19 +140,19 @@ export default function PresupuestoPage() {
       })()}
 
       {/* Summary Card con totales reales */}
-      <div className="bg-green-600 text-white rounded-xl p-6">
-        <div className="grid grid-cols-3 gap-4 mb-5">
-          <div>
-            <p className="text-green-200 text-xs mb-1">Presupuesto Total</p>
-            <p className="text-2xl font-bold">{formatear(totalBudget)}</p>
+      <div className="bg-green-600 text-white rounded-xl p-5 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mb-5">
+          <div className="flex items-baseline justify-between gap-2 sm:block">
+            <p className="text-green-200 text-xs sm:mb-1">Presupuesto Total</p>
+            <p className="text-lg sm:text-2xl font-bold whitespace-nowrap text-right sm:text-left">{formatear(totalBudget)}</p>
           </div>
-          <div>
-            <p className="text-green-200 text-xs mb-1">Total Gastado</p>
-            <p className="text-2xl font-bold">{formatear(totalSpent)}</p>
+          <div className="flex items-baseline justify-between gap-2 sm:block">
+            <p className="text-green-200 text-xs sm:mb-1">Total Gastado</p>
+            <p className="text-lg sm:text-2xl font-bold whitespace-nowrap text-right sm:text-left">{formatear(totalSpent)}</p>
           </div>
-          <div>
-            <p className="text-green-200 text-xs mb-1">Restante</p>
-            <p className="text-2xl font-bold">{formatear(totalRemaining)}</p>
+          <div className="flex items-baseline justify-between gap-2 sm:block">
+            <p className="text-green-200 text-xs sm:mb-1">Restante</p>
+            <p className="text-lg sm:text-2xl font-bold whitespace-nowrap text-right sm:text-left">{formatear(totalRemaining)}</p>
           </div>
         </div>
         <div>
@@ -171,7 +171,7 @@ export default function PresupuestoPage() {
 
       {/* Budget Grid */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-5 animate-pulse h-36" />
           ))}
@@ -181,7 +181,7 @@ export default function PresupuestoPage() {
           No tienes presupuestos para {mesNombre}. ¡Crea el primero!
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {presupuestosConGasto.map((budget) => {
             const spent = budget.spent ?? 0
             const limiteConvertido = convertir(budget.limiteMonthly, budget.monedaOrigen)
@@ -248,8 +248,8 @@ export default function PresupuestoPage() {
 
       {/* modal para crear un nuevo presupuesto */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Crear Nuevo Presupuesto</h3>
               <button onClick={() => { setShowModal(false); resetModal() }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
