@@ -335,7 +335,7 @@ export default function PerspectivasIAPage() {
             <>
               {/* skeleton mientras gemini responde */}
               {loadingIA && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-4 animate-pulse">
                       <div className="flex gap-3 mb-2">
@@ -358,7 +358,7 @@ export default function PerspectivasIAPage() {
           )}
 
           {notif.ia && !loadingIA && perspectivas.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {perspectivas.map((p, i) => {
                 const config = tipoConfig[p.tipo] ?? tipoConfig.sugerencia
                 const tieneAhorro = !!p.ahorro && p.ahorro > 0
