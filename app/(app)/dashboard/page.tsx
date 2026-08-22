@@ -95,16 +95,16 @@ export default function DashboardPage() {
   const nombreUsuario = nombre.split(' ')[0] || 'de nuevo'
 
   return (
-    <div className="p-6 space-y-5 dark:bg-slate-900 min-h-screen">
+    <div className="p-4 md:p-6 space-y-5 dark:bg-slate-900 min-h-screen">
       {/* encabezado con nombre real del usuario y selector de mes */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white">¡Bienvenido, {nombreUsuario}! 👋</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">
             Aquí está tu resumen financiero de {mesNombre} {anio}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <SelectorMes />
           <Link href="/transacciones/agregar">
             <button className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-medium transition-colors text-sm">
@@ -117,16 +117,16 @@ export default function DashboardPage() {
 
       {/* tarjetas de resumen: muestra skeleton mientras carga */}
       {loading ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white dark:bg-slate-800 rounded-xl p-5 animate-pulse h-28" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-green-600 text-white rounded-xl p-5">
             <p className="text-green-100 text-xs mb-1">Saldo Total</p>
-            <p className="text-3xl font-bold">
+            <p className="text-xl md:text-3xl font-bold">
               {formatear(saldoTotal)}
             </p>
             <p className="text-green-200 text-xs mt-2 flex items-center gap-1">
@@ -140,7 +140,7 @@ export default function DashboardPage() {
 
           <div className="bg-blue-600 text-white rounded-xl p-5">
             <p className="text-blue-100 text-xs mb-1">Saldo del Mes</p>
-            <p className="text-3xl font-bold">
+            <p className="text-xl md:text-3xl font-bold">
               {formatear(saldoMes)}
             </p>
             <p className="text-blue-200 text-xs mt-2 flex items-center gap-1">
@@ -187,7 +187,7 @@ export default function DashboardPage() {
       )}
 
       {/* graficas: area (ultimos 6 meses) y pie (distribucion de gastos) */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-5">
           <h2 className="font-semibold text-slate-800 dark:text-slate-100 mb-4 text-sm">Ingresos vs Gastos</h2>
           <ResponsiveContainer width="100%" height={190}>
