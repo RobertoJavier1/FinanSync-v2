@@ -202,35 +202,35 @@ export default function PerspectivasIAPage() {
       </div>
 
       {/* Health Score */}
-      <div className="bg-green-600 text-white rounded-xl p-6">
+      <div className="bg-green-600 text-white rounded-xl p-5 md:p-6">
         <p className="text-green-200 text-xs mb-2">Puntuación de Salud Financiera</p>
-        <div className="flex items-end justify-between mb-4">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-end sm:justify-between mb-4">
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-bold">{healthScore}</span>
+              <span className="text-4xl sm:text-5xl font-bold">{healthScore}</span>
               <span className="text-green-200 text-lg">/100</span>
             </div>
             <p className="text-green-100 text-sm mt-1">{healthLabel} • Basado en tu actividad del mes</p>
           </div>
-          <div className="text-right">
-            <div className="flex items-center gap-1 text-green-200 text-sm justify-end">
+          <div className="text-left sm:text-right">
+            <div className="flex items-center gap-1 text-green-200 text-sm justify-start sm:justify-end">
               <TrendingUp className="w-4 h-4" />
               {ingresosMes > 0 ? `${Math.round(((ingresosMes - gastosMes) / ingresosMes) * 100)}% tasa de ahorro` : 'Sin ingresos este mes'}
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4 pt-4 border-t border-green-500">
-          <div className="text-center">
-            <p className="text-green-200 text-xs mb-0.5">Ingresos</p>
-            <p className="font-bold text-lg">{formatear(ingresosMes)}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-green-500">
+          <div className="flex items-baseline justify-between gap-2 sm:block sm:text-center">
+            <p className="text-green-200 text-xs sm:mb-0.5">Ingresos</p>
+            <p className="font-bold text-base sm:text-lg whitespace-nowrap">{formatear(ingresosMes)}</p>
           </div>
-          <div className="text-center">
-            <p className="text-green-200 text-xs mb-0.5">Gastos</p>
-            <p className="font-bold text-lg">{formatear(gastosMes)}</p>
+          <div className="flex items-baseline justify-between gap-2 sm:block sm:text-center">
+            <p className="text-green-200 text-xs sm:mb-0.5">Gastos</p>
+            <p className="font-bold text-base sm:text-lg whitespace-nowrap">{formatear(gastosMes)}</p>
           </div>
-          <div className="text-center">
-            <p className="text-green-200 text-xs mb-0.5">Balance</p>
-            <p className="font-bold text-lg">{formatear(ingresosMes - gastosMes)}</p>
+          <div className="flex items-baseline justify-between gap-2 sm:block sm:text-center">
+            <p className="text-green-200 text-xs sm:mb-0.5">Balance</p>
+            <p className="font-bold text-base sm:text-lg whitespace-nowrap">{formatear(ingresosMes - gastosMes)}</p>
           </div>
         </div>
       </div>
