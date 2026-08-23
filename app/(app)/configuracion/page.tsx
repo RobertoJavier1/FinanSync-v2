@@ -217,7 +217,7 @@ export default function ConfiguracionPage() {
 
           {/* Perfil */}
           {activeTab === 'perfil' && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 space-y-5">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 md:p-6 space-y-5">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Información personal</h2>
 
               {/* feedback */}
@@ -234,7 +234,7 @@ export default function ConfiguracionPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Nombre completo</label>
                   <input
@@ -260,7 +260,7 @@ export default function ConfiguracionPage() {
                 <button
                   onClick={guardarPerfil}
                   disabled={saving}
-                  className="flex items-center gap-2 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar cambios
