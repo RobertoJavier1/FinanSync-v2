@@ -181,24 +181,24 @@ export default function ConfiguracionPage() {
   const [agregandoCategoria, setAgregandoCategoria] = useState(false)
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Configuración</h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Administra tu cuenta y preferencias</p>
       </div>
 
-      <div className="flex gap-6">
-        {/* Sidebar tabs */}
-        <div className="w-48 flex-shrink-0">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-2 space-y-0.5">
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+        {/* Sidebar tabs: tira horizontal deslizable en movil, columna en escritorio */}
+        <div className="w-full md:w-48 md:flex-shrink-0">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-2 flex gap-1 overflow-x-auto md:block md:gap-0 md:space-y-0.5">
             {tabs.map((tab) => {
               const Icon = tab.icon
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 md:gap-3 shrink-0 whitespace-nowrap w-auto md:w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'bg-green-500 text-white'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
