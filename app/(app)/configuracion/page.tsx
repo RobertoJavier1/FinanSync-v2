@@ -284,7 +284,7 @@ export default function ConfiguracionPage() {
 
           {/* Notificaciones */}
           {activeTab === 'notificaciones' && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 space-y-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 md:p-6 space-y-6">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Notificaciones</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">Elige qué alertas quieres recibir.</p>
 
@@ -307,7 +307,7 @@ export default function ConfiguracionPage() {
                   { label: 'Progreso de metas', desc: 'Actualizaciones sobre el avance de tus metas de ahorro', value: notifMetas, set: setNotifMetas },
                   { label: 'Recomendaciones IA', desc: 'Sugerencias personalizadas de Perspectivas IA', value: notifIA, set: setNotifIA },
                 ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
+                  <div key={item.label} className="flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                     <div>
                       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{item.label}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{item.desc}</p>
@@ -336,7 +336,7 @@ export default function ConfiguracionPage() {
                     }
                   }}
                   disabled={saving}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar cambios
@@ -347,7 +347,7 @@ export default function ConfiguracionPage() {
 
           {/* Seguridad */}
           {activeTab === 'seguridad' && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 space-y-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 md:p-6 space-y-6">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Seguridad</h2>
 
               {/* feedback compartido con el tab de perfil */}
@@ -435,7 +435,7 @@ export default function ConfiguracionPage() {
                     <button
                       onClick={cambiarContrasena}
                       disabled={saving || !passActual || !passNueva || !passConfirmar}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                      className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
                     >
                       {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                       Cambiar contraseña
@@ -593,7 +593,7 @@ export default function ConfiguracionPage() {
                     }
                   }}
                   disabled={saving}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Guardar cambios
