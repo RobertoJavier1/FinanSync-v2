@@ -448,7 +448,7 @@ export default function ConfiguracionPage() {
 
           {/* Apariencia */}
           {activeTab === 'apariencia' && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 space-y-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 md:p-6 space-y-6">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Apariencia</h2>
 
               <div>
@@ -461,7 +461,7 @@ export default function ConfiguracionPage() {
                     <button
                       key={t.id}
                       onClick={() => setTema(t.id as 'claro' | 'oscuro')}
-                      className={`rounded-xl p-3 text-center border-2 transition-all w-28 ${
+                      className={`rounded-xl p-3 text-center border-2 transition-all flex-1 sm:flex-none sm:w-28 ${
                         tema === t.id ? 'border-green-500' : 'border-slate-200 dark:border-slate-600'
                       }`}
                     >
@@ -477,7 +477,7 @@ export default function ConfiguracionPage() {
 
           {/* Finanzas */}
           {activeTab === 'finanzas' && (
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 space-y-6">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-5 md:p-6 space-y-6">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Preferencias financieras</h2>
 
               <div className="space-y-4">
