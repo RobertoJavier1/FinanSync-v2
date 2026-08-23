@@ -27,6 +27,9 @@ const navItems = [
   { href: '/metas',           label: 'Metas',          icon: Target },
   { href: '/perspectivas-ia', label: 'Perspectivas IA',icon: Sparkles },
   { href: '/chat-ia',         label: 'Chat IA',        icon: MessageSquare },
+  // configuracion va dentro del menu principal: al fondo del drawer quedaba
+  // debajo de la barra del navegador en el telefono y no se podia tocar
+  { href: '/configuracion',   label: 'Configuración',  icon: Settings },
 ]
 
 export default function Sidebar() {
@@ -72,7 +75,7 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 md:w-56 h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col flex-shrink-0 transform transition-transform duration-200 ease-in-out md:translate-x-0 ${
+        className={`fixed md:static inset-y-0 left-0 z-50 w-64 md:w-56 h-screen h-[100dvh] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col flex-shrink-0 transform transition-transform duration-200 ease-in-out md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -118,20 +121,9 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* seccion inferior: configuracion y boton de cerrar sesion */}
-        <div className="p-3 border-t border-slate-100 dark:border-slate-700 space-y-0.5">
-          <Link
-            href="/configuracion"
-            onClick={() => setOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              pathname === '/configuracion'
-                ? 'bg-green-500 text-white'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Settings className="w-4 h-4 flex-shrink-0" />
-            Configuración
-          </Link>
+        {/* seccion inferior: solo cerrar sesion. el padding extra deja el boton
+            por encima de la barra inferior de safari en iphone */}
+        <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-slate-100 dark:border-slate-700 space-y-0.5">
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950 w-full transition-colors"
