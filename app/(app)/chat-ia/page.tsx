@@ -199,7 +199,7 @@ export default function ChatIAPage() {
   // pantalla de carga mientras obtiene datos de Supabase
   if (cargandoContexto) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-100 dark:bg-slate-900 gap-4">
+      <div className="flex flex-col items-center justify-center h-full bg-slate-100 dark:bg-slate-900 gap-4">
         <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
           <Sparkles className="w-6 h-6 text-white" />
         </div>
@@ -213,18 +213,18 @@ export default function ChatIAPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-100 dark:bg-slate-900">
+    <div className="flex flex-col h-full bg-slate-100 dark:bg-slate-900">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
             <h1 className="font-bold text-slate-800 dark:text-white text-lg leading-tight">FinanSync AI</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Asesor financiero personal · Gemini 2.5 Flash</p>
+            <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400">Asesor financiero personal · Gemini 2.5 Flash</p>
           </div>
-          <span className="ml-2 flex items-center gap-1.5">
+          <span className="ml-2 hidden sm:flex items-center gap-1.5">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
             <span className="text-xs text-green-600 font-medium">
               {contexto ? 'Datos cargados' : 'En línea'}
@@ -242,16 +242,16 @@ export default function ChatIAPage() {
           )}
           <button
             onClick={resetChat}
-            className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-2 shrink-0 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 px-2 sm:px-3 py-1.5 rounded-lg transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
-            Nueva conversación
+            <span className="hidden sm:inline">Nueva conversación</span>
           </button>
         </div>
       </div>
 
       {/* Lista de mensajes */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
@@ -260,7 +260,7 @@ export default function ChatIAPage() {
               </div>
             )}
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === 'user'
                   ? 'bg-green-500 text-white rounded-tr-sm'
                   : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-tl-sm shadow-sm border border-slate-100 dark:border-slate-700'
@@ -314,7 +314,7 @@ export default function ChatIAPage() {
 
       {/* Sugerencias rápidas — solo al inicio */}
       {messages.length === 1 && (
-        <div className="px-6 pb-3 flex gap-2 flex-wrap justify-center">
+        <div className="px-4 md:px-6 pb-3 flex gap-2 flex-wrap justify-center">
           {SUGERENCIAS.map((s) => (
             <button
               key={s}
@@ -328,7 +328,7 @@ export default function ChatIAPage() {
       )}
 
       {/* Input */}
-      <div className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex-shrink-0">
+      <div className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-4 md:px-6 py-3 md:py-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex-shrink-0">
         <div className="flex gap-3 items-end">
           <textarea
             ref={inputRef}
@@ -348,7 +348,7 @@ export default function ChatIAPage() {
             <Send className="w-4 h-4" />
           </button>
         </div>
-        <p className="text-xs text-slate-400 mt-2 text-center">
+        <p className="hidden sm:block text-xs text-slate-400 mt-2 text-center">
           Shift+Enter para nueva línea · Enter para enviar
         </p>
       </div>

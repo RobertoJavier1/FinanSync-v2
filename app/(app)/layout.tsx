@@ -34,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!user) return null
 
   return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-100 dark:bg-slate-900">
+    <div className="flex flex-col md:flex-row h-screen h-[100dvh] overflow-hidden bg-slate-100 dark:bg-slate-900">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <FinanzasProvider>
