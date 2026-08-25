@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Check } from 'lucide-react'
+import { ChevronLeft, Check, Camera, Upload, X, FileText } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
 import { agregarTransaccion } from '@/lib/transacciones'
@@ -22,6 +22,33 @@ export default function AgregarTransaccionPage() {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const [facturaImagen, setFacturaImagen] = useState<File | null>(null)
+  const [facturaPreviewUrl, setFacturaPreviewUrl] = useState<string | null>(null)
+  const inputCamaraRef = useRef<HTMLInputElement>(null)
+  const inputArchivoRef = useRef<HTMLInputElement>(null)
+
+  // libera el object URL anterior para no filtrar memoria al cambiar/quitar la imagen
+  useEffect(() => {
+    return () => {
+      if (facturaPreviewUrl) URL.revokeObjectURL(facturaPreviewUrl)
+    }
+  }, [facturaPreviewUrl])
+
+  function handleSeleccionarFactura(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite volver a elegir el mismo archivo despues de quitarlo
+    if (!file) return
+    if (facturaPreviewUrl) URL.revokeObjectURL(facturaPreviewUrl)
+    setFacturaImagen(file)
+    setFacturaPreviewUrl(URL.createObjectURL(file))
+  }
+
+  function handleQuitarFactura() {
+    if (facturaPreviewUrl) URL.revokeObjectURL(facturaPreviewUrl)
+    setFacturaImagen(null)
+    setFacturaPreviewUrl(null)
+  }
 
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault()
@@ -65,6 +92,76 @@ export default function AgregarTransaccionPage() {
 
       {/* Form */}
       <form onSubmit={handleGuardar} className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-xl p-5 sm:p-8 space-y-6">
+        {/* Escanear o subir factura */}
+        <div>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            Factura (Opcional)
+          </p>
+
+          {!facturaPreviewUrl ? (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => inputCamaraRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 py-5 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:border-green-400 hover:text-green-500 transition-colors text-sm font-medium"
+              >
+                <Camera className="w-5 h-5" />
+                Tomar foto
+              </button>
+              <button
+                type="button"
+                onClick={() => inputArchivoRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 py-5 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:border-green-400 hover:text-green-500 transition-colors text-sm font-medium"
+              >
+                <Upload className="w-5 h-5" />
+                Subir imagen
+              </button>
+            </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={facturaPreviewUrl}
+                alt="Vista previa de la factura"
+                className="w-full max-h-64 object-contain bg-slate-100 dark:bg-slate-900"
+              />
+              <button
+                type="button"
+                onClick={handleQuitarFactura}
+                aria-label="Quitar factura"
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/70 text-white hover:bg-slate-900/90 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-700 text-xs text-slate-500 dark:text-slate-300">
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{facturaImagen?.name}</span>
+              </div>
+            </div>
+          )}
+
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+            Próximamente completaremos el formulario automáticamente a partir de la foto.
+          </p>
+
+          {/* inputs ocultos: capture=environment abre la camara directo en movil */}
+          <input
+            ref={inputCamaraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleSeleccionarFactura}
+            className="hidden"
+          />
+          <input
+            ref={inputArchivoRef}
+            type="file"
+            accept="image/*"
+            onChange={handleSeleccionarFactura}
+            className="hidden"
+          />
+        </div>
+
         {/* Type Toggle */}
         <div>
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Tipo de Transacción</p>
