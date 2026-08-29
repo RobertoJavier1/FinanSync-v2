@@ -41,6 +41,9 @@ export default function AgregarTransaccionPage() {
   const [errorFactura, setErrorFactura] = useState('')
   const [categoriaSugerida, setCategoriaSugerida] = useState<string | null>(null)
   const [agregandoCategoria, setAgregandoCategoria] = useState(false)
+  const [mostrarNuevaCategoria, setMostrarNuevaCategoria] = useState(false)
+  const [nuevaCategoriaInput, setNuevaCategoriaInput] = useState('')
+  const [errorCategoria, setErrorCategoria] = useState('')
   const inputCamaraRef = useRef<HTMLInputElement>(null)
   const inputArchivoRef = useRef<HTMLInputElement>(null)
 
@@ -122,6 +125,34 @@ export default function AgregarTransaccionPage() {
       setCategoriaSugerida(null)
     } catch {
       setErrorFactura('No se pudo agregar la categoría')
+    } finally {
+      setAgregandoCategoria(false)
+    }
+  }
+
+  // agrega una categoria escrita a mano (boton "+ Nueva categoria"), sin salir
+  // de este formulario ni pasar por Configuracion
+  async function handleAgregarCategoriaManual() {
+    const nombre = nuevaCategoriaInput.trim()
+    if (!nombre) return
+    setErrorCategoria('')
+
+    // ya existe: solo la selecciona, no hace falta llamar a guardar()
+    if (finanzas.categorias.includes(nombre)) {
+      setCategory(nombre)
+      setMostrarNuevaCategoria(false)
+      setNuevaCategoriaInput('')
+      return
+    }
+
+    setAgregandoCategoria(true)
+    try {
+      await guardar({ moneda: finanzas.moneda, categorias: [...finanzas.categorias, nombre] })
+      setCategory(nombre)
+      setMostrarNuevaCategoria(false)
+      setNuevaCategoriaInput('')
+    } catch {
+      setErrorCategoria('No se pudo agregar la categoría')
     } finally {
       setAgregandoCategoria(false)
     }
@@ -342,6 +373,57 @@ export default function AgregarTransaccionPage() {
               </button>
             </div>
           )}
+
+          {/* agregar una categoria nueva sin salir del formulario ni ir a Configuracion */}
+          {!categoriaSugerida && (
+            mostrarNuevaCategoria ? (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={nuevaCategoriaInput}
+                  onChange={(e) => setNuevaCategoriaInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAgregarCategoriaManual()
+                    }
+                  }}
+                  placeholder="Nombre de la categoría"
+                  autoFocus
+                  className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleAgregarCategoriaManual}
+                  disabled={agregandoCategoria || !nuevaCategoriaInput.trim()}
+                  className="shrink-0 text-xs font-medium text-green-600 dark:text-green-400 underline disabled:opacity-50"
+                >
+                  {agregandoCategoria ? 'Agregando...' : 'Agregar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMostrarNuevaCategoria(false)
+                    setNuevaCategoriaInput('')
+                    setErrorCategoria('')
+                  }}
+                  aria-label="Cancelar"
+                  className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setMostrarNuevaCategoria(true)}
+                className="mt-2 text-xs font-medium text-green-600 dark:text-green-400 hover:underline"
+              >
+                + Nueva categoría
+              </button>
+            )
+          )}
+          {errorCategoria && <p className="text-xs text-red-500 mt-1">{errorCategoria}</p>}
         </div>
 
         {/* Date */}
