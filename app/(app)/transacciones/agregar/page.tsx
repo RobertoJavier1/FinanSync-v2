@@ -10,6 +10,18 @@ import { agregarTransaccion } from '@/lib/transacciones'
 
 const SIMBOLOS: Record<string, string> = { MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$' }
 
+function hoyISO() {
+  return new Date().toISOString().split('T')[0]
+}
+
+interface FacturaExtraida {
+  monto: number | null
+  fecha: string | null
+  comercio: string | null
+  categoria: string | null
+  descripcion: string | null
+}
+
 export default function AgregarTransaccionPage() {
   const { user } = useAuth()
   const { finanzas } = useFinanzas()
@@ -18,13 +30,15 @@ export default function AgregarTransaccionPage() {
   const [type, setType] = useState<'expense' | 'income'>('expense')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]) // YYYY-MM-DD
+  const [date, setDate] = useState(hoyISO) // YYYY-MM-DD
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [facturaImagen, setFacturaImagen] = useState<File | null>(null)
   const [facturaPreviewUrl, setFacturaPreviewUrl] = useState<string | null>(null)
+  const [analizandoFactura, setAnalizandoFactura] = useState(false)
+  const [errorFactura, setErrorFactura] = useState('')
   const inputCamaraRef = useRef<HTMLInputElement>(null)
   const inputArchivoRef = useRef<HTMLInputElement>(null)
 
@@ -42,12 +56,51 @@ export default function AgregarTransaccionPage() {
     if (facturaPreviewUrl) URL.revokeObjectURL(facturaPreviewUrl)
     setFacturaImagen(file)
     setFacturaPreviewUrl(URL.createObjectURL(file))
+    analizarFactura(file) // analisis automatico en cuanto se elige/toma la foto
   }
 
   function handleQuitarFactura() {
     if (facturaPreviewUrl) URL.revokeObjectURL(facturaPreviewUrl)
     setFacturaImagen(null)
     setFacturaPreviewUrl(null)
+    setErrorFactura('')
+  }
+
+  // manda la imagen a /api/facturas (Gemini vision) y autocompleta el formulario.
+  // usa updates funcionales (prev => ...) porque esto es async: para cuando la
+  // respuesta llega, el usuario ya pudo haber escrito algo mas en el formulario.
+  async function analizarFactura(file: File) {
+    setAnalizandoFactura(true)
+    setErrorFactura('')
+    try {
+      const formData = new FormData()
+      formData.append('imagen', file)
+      formData.append('categorias', JSON.stringify(finanzas.categorias))
+
+      const res = await fetch('/api/facturas', { method: 'POST', body: formData })
+      const data: FacturaExtraida & { error?: string } = await res.json()
+
+      if (!res.ok) {
+        setErrorFactura(data.error || 'No se pudo analizar la factura')
+        return
+      }
+
+      // solo rellena lo que el usuario dejo vacio, para no pisar lo que ya escribio
+      if (data.monto != null) setAmount((prev) => prev || String(data.monto))
+      if (data.descripcion) setDescription((prev) => prev || data.descripcion!)
+      // la fecha ya trae un valor por defecto (hoy), asi que la tratamos como
+      // "vacia" solo si el usuario no la ha cambiado todavia
+      if (data.fecha) setDate((prev) => (prev === hoyISO() ? data.fecha! : prev))
+      // solo aceptamos la categoria si es una que realmente existe en el select,
+      // por si Gemini inventa un nombre que no esta en la lista que le mandamos
+      if (data.categoria && finanzas.categorias.includes(data.categoria)) {
+        setCategory((prev) => prev || data.categoria!)
+      }
+    } catch {
+      setErrorFactura('No se pudo analizar la factura')
+    } finally {
+      setAnalizandoFactura(false)
+    }
   }
 
   async function handleGuardar(e: React.FormEvent) {
@@ -125,6 +178,13 @@ export default function AgregarTransaccionPage() {
                 alt="Vista previa de la factura"
                 className="w-full max-h-64 object-contain bg-slate-100 dark:bg-slate-900"
               />
+              {/* overlay mientras Gemini analiza la imagen, tapa la foto para que quede claro que esta ocupado */}
+              {analizandoFactura && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-900/60 text-white text-sm">
+                  <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Analizando factura...
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleQuitarFactura}
@@ -140,9 +200,23 @@ export default function AgregarTransaccionPage() {
             </div>
           )}
 
-          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-            Próximamente completaremos el formulario automáticamente a partir de la foto.
-          </p>
+          {errorFactura ? (
+            <p className="text-xs text-amber-500 mt-2">
+              {errorFactura} — puedes llenar el formulario manualmente o{' '}
+              <button
+                type="button"
+                onClick={() => facturaImagen && analizarFactura(facturaImagen)}
+                className="underline font-medium hover:text-amber-600"
+              >
+                reintentar
+              </button>
+              .
+            </p>
+          ) : (
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+              Al elegir la foto se intenta llenar el formulario automáticamente.
+            </p>
+          )}
 
           {/* inputs ocultos: capture=environment abre la camara directo en movil */}
           <input
