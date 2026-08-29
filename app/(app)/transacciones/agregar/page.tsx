@@ -24,7 +24,7 @@ interface FacturaExtraida {
 
 export default function AgregarTransaccionPage() {
   const { user } = useAuth()
-  const { finanzas } = useFinanzas()
+  const { finanzas, guardar } = useFinanzas()
   const router = useRouter()
 
   const [type, setType] = useState<'expense' | 'income'>('expense')
@@ -39,6 +39,8 @@ export default function AgregarTransaccionPage() {
   const [facturaPreviewUrl, setFacturaPreviewUrl] = useState<string | null>(null)
   const [analizandoFactura, setAnalizandoFactura] = useState(false)
   const [errorFactura, setErrorFactura] = useState('')
+  const [categoriaSugerida, setCategoriaSugerida] = useState<string | null>(null)
+  const [agregandoCategoria, setAgregandoCategoria] = useState(false)
   const inputCamaraRef = useRef<HTMLInputElement>(null)
   const inputArchivoRef = useRef<HTMLInputElement>(null)
 
@@ -64,6 +66,7 @@ export default function AgregarTransaccionPage() {
     setFacturaImagen(null)
     setFacturaPreviewUrl(null)
     setErrorFactura('')
+    setCategoriaSugerida(null)
   }
 
   // manda la imagen a /api/facturas (Gemini vision) y autocompleta el formulario.
@@ -91,15 +94,36 @@ export default function AgregarTransaccionPage() {
       // la fecha ya trae un valor por defecto (hoy), asi que la tratamos como
       // "vacia" solo si el usuario no la ha cambiado todavia
       if (data.fecha) setDate((prev) => (prev === hoyISO() ? data.fecha! : prev))
-      // solo aceptamos la categoria si es una que realmente existe en el select,
-      // por si Gemini inventa un nombre que no esta en la lista que le mandamos
-      if (data.categoria && finanzas.categorias.includes(data.categoria)) {
-        setCategory((prev) => prev || data.categoria!)
+      // si la categoria ya existe, la seleccionamos directo; si no, se ofrece
+      // como sugerencia para agregarla (no se crea sola, el usuario decide)
+      if (data.categoria) {
+        if (finanzas.categorias.includes(data.categoria)) {
+          setCategory((prev) => prev || data.categoria!)
+        } else {
+          setCategoriaSugerida(data.categoria)
+        }
       }
     } catch {
       setErrorFactura('No se pudo analizar la factura')
     } finally {
       setAnalizandoFactura(false)
+    }
+  }
+
+  // agrega la categoria sugerida por Gemini a la lista del usuario (reusa el
+  // guardar() del contexto, el mismo que usa la pagina de configuracion) y la
+  // deja seleccionada en el formulario
+  async function handleAgregarCategoriaSugerida() {
+    if (!categoriaSugerida) return
+    setAgregandoCategoria(true)
+    try {
+      await guardar({ moneda: finanzas.moneda, categorias: [...finanzas.categorias, categoriaSugerida] })
+      setCategory((prev) => prev || categoriaSugerida)
+      setCategoriaSugerida(null)
+    } catch {
+      setErrorFactura('No se pudo agregar la categoría')
+    } finally {
+      setAgregandoCategoria(false)
     }
   }
 
@@ -302,6 +326,22 @@ export default function AgregarTransaccionPage() {
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
+
+          {categoriaSugerida && (
+            <div className="mt-2 flex items-center justify-between gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+              <p className="text-xs text-green-700 dark:text-green-400">
+                La factura sugiere la categoría <span className="font-semibold">{categoriaSugerida}</span>, que no tienes agregada.
+              </p>
+              <button
+                type="button"
+                onClick={handleAgregarCategoriaSugerida}
+                disabled={agregandoCategoria}
+                className="shrink-0 text-xs font-medium text-green-700 dark:text-green-400 underline disabled:opacity-50"
+              >
+                {agregandoCategoria ? 'Agregando...' : 'Agregar y usar'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Date */}
