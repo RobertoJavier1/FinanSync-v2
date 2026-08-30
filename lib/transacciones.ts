@@ -128,6 +128,15 @@ export async function subirFacturaTransaccion(idTransaccion: string, imagen: Fil
   }
 }
 
+// pide una URL firmada (temporal) para ver la imagen de la factura de una
+// transaccion. el backend valida que la transaccion sea del usuario logueado
+export async function obtenerUrlFactura(idTransaccion: string): Promise<string> {
+  const res = await fetch(`/api/facturas/ver?idTransaccion=${idTransaccion}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Error al obtener la factura')
+  return data.url
+}
+
 export async function eliminarTransaccion(uid: string, id: string): Promise<void> {
   const { error } = await supabase
     .from('transacciones')

@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Search, Trash2, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Search, Trash2, Plus, ArrowUpRight, ArrowDownRight, Receipt, X } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
 import { usePeriodo } from '@/context/PeriodoContext'
 import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { useQueryClient } from '@tanstack/react-query'
-import { eliminarTransaccion } from '@/lib/transacciones'
+import { eliminarTransaccion, obtenerUrlFactura } from '@/lib/transacciones'
 import SelectorMes from '@/components/SelectorMes'
 
 export default function TransaccionesPage() {
@@ -20,6 +20,9 @@ export default function TransaccionesPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [cargandoFacturaId, setCargandoFacturaId] = useState<string | null>(null)
+  const [facturaUrl, setFacturaUrl] = useState<string | null>(null)
+  const [errorFactura, setErrorFactura] = useState('')
 
   // elimina en la base de datos y le avisa al cache que ese usuario debe refrescar sus transacciones.
   // el prefijo ['transacciones', user.id] invalida tambien la version por mes (['transacciones', user.id, mes, anio])
@@ -27,6 +30,20 @@ export default function TransaccionesPage() {
     if (!user) return
     await eliminarTransaccion(user.id, id)
     queryClient.invalidateQueries({ queryKey: ['transacciones', user.id] })
+  }
+
+  // pide una URL firmada nueva cada vez (expira a los 15 min, no tiene caso guardarla)
+  async function handleVerFactura(id: string) {
+    setCargandoFacturaId(id)
+    setErrorFactura('')
+    try {
+      const url = await obtenerUrlFactura(id)
+      setFacturaUrl(url)
+    } catch {
+      setErrorFactura('No se pudo cargar la factura')
+    } finally {
+      setCargandoFacturaId(null)
+    }
   }
 
   // aplica los tres filtros en simultaneo sobre la lista cargada desde Supabase
@@ -126,6 +143,16 @@ export default function TransaccionesPage() {
                 <span className={`font-semibold text-base ${t.tipo === 'income' ? 'text-green-600' : 'text-red-500'}`}>
                   {t.tipo === 'income' ? '+' : '-'}{formatear(t.monto, t.monedaOrigen)}
                 </span>
+                {t.facturaPath && (
+                  <button
+                    onClick={() => handleVerFactura(t.id)}
+                    disabled={cargandoFacturaId === t.id}
+                    aria-label="Ver factura"
+                    className="text-slate-400 hover:text-green-600 transition-colors disabled:opacity-50"
+                  >
+                    <Receipt className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleEliminar(t.id)}
                   className="text-red-400 hover:text-red-600 transition-colors"
@@ -135,6 +162,34 @@ export default function TransaccionesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {errorFactura && (
+        <p className="text-center text-sm text-red-500">{errorFactura}</p>
+      )}
+
+      {/* Modal: imagen de la factura */}
+      {facturaUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4"
+          onClick={() => setFacturaUrl(null)}
+        >
+          <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setFacturaUrl(null)}
+              aria-label="Cerrar"
+              className="absolute -top-3 -right-3 p-1.5 rounded-full bg-slate-800 text-white hover:bg-slate-900 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={facturaUrl}
+              alt="Factura"
+              className="w-full max-h-[80vh] object-contain rounded-lg bg-white"
+            />
+          </div>
         </div>
       )}
 
