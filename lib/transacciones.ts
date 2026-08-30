@@ -20,6 +20,7 @@ export interface Transaccion {
   monto: number
   tipo: 'income' | 'expense'
   monedaOrigen: string  // moneda activa del usuario al crear la transaccion
+  facturaPath: string | null  // path del objeto en GCS, o null si no tiene factura
 }
 
 // une las filas de la tabla con los nombres de categoria ya resueltos
@@ -35,6 +36,7 @@ function mapearFilas(filas: any[], nombrePorId: Map<string, string>): Transaccio
     monto: Number(row.monto),
     tipo: row.tipo,
     monedaOrigen: row.moneda_origen,
+    facturaPath: row.factura_path,
   }))
 }
 
@@ -88,7 +90,7 @@ export async function getTransaccionesPorMes(
 
 export async function agregarTransaccion(
   uid: string,
-  data: Omit<Transaccion, 'id' | 'uid' | 'fecha'>,
+  data: Omit<Transaccion, 'id' | 'uid' | 'fecha' | 'facturaPath'>,
 ): Promise<string> {
   // la página manda el nombre de la categoría; la base necesita su id
   const idCategoria = await asegurarCategoria(uid, data.categoria)
@@ -109,6 +111,21 @@ export async function agregarTransaccion(
 
   if (error) throw error
   return row.id_transaccion
+}
+
+// sube la imagen de la factura a Google Cloud Storage y la asocia a la
+// transaccion ya creada. se llama despues de agregarTransaccion porque el
+// nombre del objeto en el bucket usa el id de la transaccion
+export async function subirFacturaTransaccion(idTransaccion: string, imagen: File): Promise<void> {
+  const formData = new FormData()
+  formData.append('imagen', imagen)
+  formData.append('idTransaccion', idTransaccion)
+
+  const res = await fetch('/api/facturas/subir', { method: 'POST', body: formData })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Error al guardar la imagen de la factura')
+  }
 }
 
 export async function eliminarTransaccion(uid: string, id: string): Promise<void> {

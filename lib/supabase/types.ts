@@ -72,6 +72,7 @@ export interface Database {
           monto: number
           tipo: TipoTransaccion
           moneda_origen: string
+          factura_path: string | null
           creado_en: string
         }
         Insert: {
@@ -83,6 +84,7 @@ export interface Database {
           monto: number
           tipo: TipoTransaccion
           moneda_origen?: string
+          factura_path?: string | null
         }
         Update: {
           id_categoria?: string | null
@@ -91,6 +93,7 @@ export interface Database {
           monto?: number
           tipo?: TipoTransaccion
           moneda_origen?: string
+          factura_path?: string | null
         }
         Relationships: []
       }

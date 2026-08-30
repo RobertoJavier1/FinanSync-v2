@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ChevronLeft, Check, Camera, Upload, X, FileText } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
-import { agregarTransaccion } from '@/lib/transacciones'
+import { agregarTransaccion, subirFacturaTransaccion } from '@/lib/transacciones'
 
 const SIMBOLOS: Record<string, string> = { MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$' }
 
@@ -170,7 +170,7 @@ export default function AgregarTransaccionPage() {
     setError('')
     try {
       // si no hay descripcion se usa la categoria como nombre de la transaccion
-      await agregarTransaccion(user.id, {
+      const idTransaccion = await agregarTransaccion(user.id, {
         descripcion: description.trim() || category,
         categoria: category,
         fechaISO: date,
@@ -178,6 +178,17 @@ export default function AgregarTransaccionPage() {
         tipo: type,
         monedaOrigen: finanzas.moneda,
       })
+
+      // la transaccion ya se guardo; si falla subir la imagen no se bloquea
+      // la navegacion, solo se pierde el respaldo de la factura
+      if (facturaImagen) {
+        try {
+          await subirFacturaTransaccion(idTransaccion, facturaImagen)
+        } catch (errorFactura) {
+          console.error('Error al subir la imagen de la factura:', errorFactura)
+        }
+      }
+
       router.push('/transacciones')
     } catch {
       setError('Error al guardar la transacción. Intenta de nuevo.')
