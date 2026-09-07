@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, Download } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
 import { MESES } from '@/context/PeriodoContext'
@@ -68,6 +68,8 @@ export default function ReportesPage() {
 
   const [meses, setMeses] = useState<number>(6)
   const [vista, setVista] = useState<Vista>('mensual')
+  const [exportando, setExportando] = useState(false)
+  const contenidoRef = useRef<HTMLDivElement>(null)
 
   const { data: filasComparativa = [], isLoading: cargandoComparativa } = useComparativaMensual(user?.id, meses)
   const { data: filasPromedio = [], isLoading: cargandoPromedio } = usePromedioCategoria(user?.id, meses)
@@ -87,6 +89,160 @@ export default function ReportesPage() {
   const categoriaTop = promedios[0]
 
   const cargando = cargandoComparativa || cargandoPromedio
+
+  // arma el pdf dibujando texto/formas con los datos ya calculados (comparativa,
+  // promedios), en vez de capturar el dom como imagen
+  async function handleExportar() {
+    setExportando(true)
+    try {
+      const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const margin = 40
+      const contentWidth = pageWidth - margin * 2
+      let y = margin
+
+      // encabezado
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(20)
+      pdf.setTextColor(30, 41, 59)
+      pdf.text('Reporte Financiero', margin, y)
+      y += 20
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(10)
+      pdf.setTextColor(100, 116, 139)
+      const periodoTexto = vista === 'mensual' ? `Vista mensual · últimos ${meses} meses` : `Vista anual · últimos ${meses} meses`
+      pdf.text(`${periodoTexto} · generado el ${new Date().toLocaleDateString('es-GT')}`, margin, y)
+      y += 25
+
+      // tarjetas resumen, como tres columnas de texto
+      const colWidth = contentWidth / 3
+      const tarjetas = [
+        { label: 'Ingresos del periodo', valor: formatear(totalIngresos), color: [22, 163, 74] as const },
+        { label: 'Gastos del periodo', valor: formatear(totalGastos), color: [220, 38, 38] as const },
+        { label: 'Categoría con más gasto', valor: categoriaTop ? categoriaTop.categoria : 'Sin datos', color: [30, 41, 59] as const },
+      ]
+      tarjetas.forEach((t, i) => {
+        const x = margin + colWidth * i
+        pdf.setDrawColor(226, 232, 240)
+        pdf.roundedRect(x, y, colWidth - 10, 55, 4, 4, 'S')
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 116, 139)
+        pdf.text(t.label, x + 10, y + 18, { maxWidth: colWidth - 20 })
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(13)
+        pdf.setTextColor(t.color[0], t.color[1], t.color[2])
+        pdf.text(t.valor, x + 10, y + 40, { maxWidth: colWidth - 20 })
+      })
+      y += 80
+
+      // grafica de barras: ingresos vs gastos, dibujada con rectangulos escalados al maximo valor
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(12)
+      pdf.setTextColor(30, 41, 59)
+      pdf.text(`Ingresos vs Gastos ${vista === 'mensual' ? 'por mes' : 'por año'}`, margin, y)
+      y += 22
+
+      if (comparativa.length === 0) {
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+        pdf.setTextColor(148, 163, 184)
+        pdf.text('Sin datos en este periodo', margin, y + 20)
+        y += 40
+      } else {
+        const chartHeight = 140
+        const chartTop = y
+        const maxValor = Math.max(...comparativa.flatMap((c) => [c.ingresos, c.gastos]), 1)
+        // gutter a la izquierda reservado para las etiquetas del eje y, para que no se encimen con la primera barra
+        const ejeGutter = 42
+        const plotLeft = margin + ejeGutter
+        const plotWidth = contentWidth - ejeGutter
+        const grupoWidth = plotWidth / comparativa.length
+        const barWidth = Math.min(18, grupoWidth / 3)
+
+        // lineas guia horizontales con su valor en el eje, como el eje Y de la grafica en pantalla
+        const pasos = 4
+        pdf.setFontSize(6.5)
+        pdf.setFont('helvetica', 'normal')
+        for (let p = 0; p <= pasos; p++) {
+          const valorPaso = (maxValor / pasos) * p
+          const yLinea = chartTop + chartHeight - (valorPaso / maxValor) * chartHeight
+          pdf.setDrawColor(241, 245, 249)
+          pdf.line(plotLeft, yLinea, plotLeft + plotWidth, yLinea)
+          pdf.setTextColor(148, 163, 184)
+          pdf.text(formatear(valorPaso), plotLeft - 4, yLinea - 2, { align: 'right' })
+        }
+
+        comparativa.forEach((c, i) => {
+          const xGrupo = plotLeft + grupoWidth * i + grupoWidth / 2
+          const hIngresos = (c.ingresos / maxValor) * chartHeight
+          const hGastos = (c.gastos / maxValor) * chartHeight
+          const xIngresos = xGrupo - barWidth - 2
+          const xGastos = xGrupo + 2
+
+          pdf.setFillColor(34, 197, 94)
+          pdf.rect(xIngresos, chartTop + chartHeight - hIngresos, barWidth, hIngresos, 'F')
+          pdf.setFillColor(239, 68, 68)
+          pdf.rect(xGastos, chartTop + chartHeight - hGastos, barWidth, hGastos, 'F')
+
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(7)
+          pdf.setTextColor(100, 116, 139)
+          pdf.text(c.label, xGrupo, chartTop + chartHeight + 12, { align: 'center', maxWidth: grupoWidth })
+        })
+
+        // eje base
+        pdf.setDrawColor(203, 213, 225)
+        pdf.line(plotLeft, chartTop + chartHeight, plotLeft + plotWidth, chartTop + chartHeight)
+
+        // leyenda
+        const leyendaY = chartTop + chartHeight + 25
+        pdf.setFillColor(34, 197, 94)
+        pdf.rect(margin, leyendaY, 8, 8, 'F')
+        pdf.setTextColor(71, 85, 105)
+        pdf.setFontSize(8)
+        pdf.text('Ingresos', margin + 12, leyendaY + 7)
+        pdf.setFillColor(239, 68, 68)
+        pdf.rect(margin + 70, leyendaY, 8, 8, 'F')
+        pdf.text('Gastos', margin + 82, leyendaY + 7)
+
+        y = leyendaY + 25
+      }
+
+      // tabla de promedio de gasto por categoria
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(12)
+      pdf.setTextColor(30, 41, 59)
+      pdf.text(`Promedio de gasto por categoría (últimos ${meses} meses)`, margin, y)
+      y += 10
+
+      if (promedios.length === 0) {
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(10)
+        pdf.setTextColor(148, 163, 184)
+        pdf.text('No hay gastos en este periodo', margin, y + 20)
+      } else {
+        autoTable(pdf, {
+          startY: y + 5,
+          margin: { left: margin, right: margin },
+          head: [['Categoría', 'Promedio mensual', 'Total gastado']],
+          body: promedios.map((p) => [p.categoria, formatear(p.promedio), formatear(p.total)]),
+          styles: { fontSize: 9, textColor: [51, 65, 85] },
+          headStyles: { fillColor: [30, 41, 59], textColor: 255 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+        })
+      }
+
+      pdf.save(`reportes-finansync-${vista}-${meses}m.pdf`)
+    } finally {
+      setExportando(false)
+    }
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-5 dark:bg-slate-900 min-h-screen">
@@ -132,10 +288,20 @@ export default function ReportesPage() {
               </button>
             ))}
           </div>
+
+          <button
+            onClick={handleExportar}
+            disabled={exportando || cargando}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            {exportando ? 'Generando...' : 'Exportar PDF'}
+          </button>
         </div>
       </div>
 
-      {/* tarjetas resumen */}
+      {/* tarjetas resumen + graficas: todo dentro de este div se captura al exportar a PDF */}
+      <div ref={contenidoRef} className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-xl p-5">
           <div className="flex justify-between items-start">
@@ -225,6 +391,7 @@ export default function ReportesPage() {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   )
