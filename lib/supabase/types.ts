@@ -174,6 +174,27 @@ export interface Database {
         Args: Record<string, never>
         Returns: undefined
       }
+      reporte_comparativa_mensual: {
+        Args: { p_meses?: number }
+        Returns: {
+          anio: number
+          mes: number
+          tipo: TipoTransaccion
+          moneda_origen: string
+          total: number
+        }[]
+      }
+      reporte_promedio_categoria: {
+        Args: { p_meses?: number }
+        Returns: {
+          id_categoria: string
+          nombre_categoria: string
+          moneda_origen: string
+          total_gastado: number
+          meses_con_movimiento: number
+          promedio_mensual: number
+        }[]
+      }
     }
     Enums: {
       tipo_transaccion: TipoTransaccion

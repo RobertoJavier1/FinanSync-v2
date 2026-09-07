@@ -8,6 +8,7 @@ import {
   Receipt,
   Wallet,
   Target,
+  BarChart3,
   Sparkles,
   MessageSquare,
   Settings,
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/transacciones',   label: 'Transacciones',  icon: Receipt },
   { href: '/presupuesto',     label: 'Presupuesto',    icon: Wallet },
   { href: '/metas',           label: 'Metas',          icon: Target },
+  { href: '/reportes',        label: 'Reportes',       icon: BarChart3 },
   { href: '/perspectivas-ia', label: 'Perspectivas IA',icon: Sparkles },
   { href: '/chat-ia',         label: 'Chat IA',        icon: MessageSquare },
   // configuracion va dentro del menu principal: al fondo del drawer quedaba
