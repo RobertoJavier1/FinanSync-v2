@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
+import { leerTextoFactura } from '@/lib/vision'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
+
+// por debajo de esto no hay factura que valga: una foto movida o un objeto
+// cualquiera devuelve cero o unos pocos caracteres sueltos. cortar aqui evita
+// gastar una peticion de la cuota del modelo en algo que no se puede leer
+const MINIMO_CARACTERES_OCR = 25
 
 // el chat (app/api/chat/route.ts) usa gemini-2.5-flash. la cuota gratis es de 20
 // peticiones/dia POR MODELO (no compartida entre modelos), asi que facturas usa
@@ -76,17 +82,32 @@ export async function POST(req: Request) {
 
     const categorias: string[] = categoriasRaw ? JSON.parse(categoriasRaw) : []
     const bytes = Buffer.from(await imagen.arrayBuffer())
-    const base64 = bytes.toString('base64')
+
+    // paso 1: OCR con Cloud Vision. si Vision no esta disponible (API sin
+    // habilitar, credenciales, red) se deja en null y mas abajo se cae al modo
+    // anterior de mandarle la imagen completa al modelo, para que la funcion
+    // siga sirviendo aunque Vision falle
+    let textoFactura: string | null = null
+    try {
+      textoFactura = await leerTextoFactura(bytes)
+      console.log(`Vision: ${textoFactura.length} caracteres extraidos`)
+    } catch (error) {
+      console.error('Vision fallo, se manda la imagen completa al modelo:', error)
+    }
+
+    // Vision respondio pero la imagen no tiene texto legible: no hace falta
+    // molestar al modelo para saber que esto no es una factura
+    if (textoFactura !== null && textoFactura.length < MINIMO_CARACTERES_OCR) {
+      return NextResponse.json({ error: 'La imagen no parece ser una factura legible' }, { status: 422 })
+    }
 
     const instruccionCategoria = categorias.length
       ? `Elige la categoría más adecuada de esta lista exacta (usa el texto tal cual aparece): ${categorias.join(', ')}. Si ninguna encaja bien, usa null.`
       : 'No hay categorías disponibles, deja "categoria" en null.'
 
-    const prompt = `Analiza esta imagen de una factura o recibo de compra y extrae los datos.
-
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown, con esta forma exacta:
+    const formatoRespuesta = `Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown, con esta forma exacta:
 {
-  "es_factura": true o false (false si la imagen no parece un recibo/factura o está demasiado borrosa/ilegible),
+  "es_factura": true o false (false si no parece un recibo/factura o está demasiado incompleto/ilegible),
   "monto": número (el total pagado, sin símbolo de moneda) o null,
   "fecha": "YYYY-MM-DD" o null si no se distingue,
   "comercio": "nombre del comercio/tienda" o null,
@@ -94,19 +115,33 @@ Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown
   "descripcion": "breve descripción, ej. nombre del comercio o tipo de compra" o null
 }
 
-${instruccionCategoria}
-Si la imagen está borrosa, incompleta o no es una factura, responde con "es_factura": false y el resto de campos en null.`
+${instruccionCategoria}`
+
+    // paso 2: interpretacion. con texto se manda solo texto (mucho mas barato
+    // en tokens); sin texto se manda la imagen igual que antes
+    const partes = textoFactura
+      ? [{
+          text: `Analiza el siguiente texto, extraído por OCR de una factura o recibo de compra, y extrae los datos.
+
+--- TEXTO DE LA FACTURA ---
+${textoFactura}
+--- FIN DEL TEXTO ---
+
+${formatoRespuesta}
+Si el texto no corresponde a una factura o está demasiado incompleto, responde con "es_factura": false y el resto de campos en null.`,
+        }]
+      : [
+          {
+            text: `Analiza esta imagen de una factura o recibo de compra y extrae los datos.
+
+${formatoRespuesta}
+Si la imagen está borrosa, incompleta o no es una factura, responde con "es_factura": false y el resto de campos en null.`,
+          },
+          { inline_data: { mime_type: imagen.type || 'image/jpeg', data: bytes.toString('base64') } },
+        ]
 
     const res = await llamarGemini({
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: imagen.type || 'image/jpeg', data: base64 } },
-          ],
-        },
-      ],
+      contents: [{ role: 'user', parts: partes }],
     })
 
     if (!res.ok) {
