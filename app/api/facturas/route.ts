@@ -3,9 +3,9 @@ import { leerTextoFactura } from '@/lib/vision'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 
-// por debajo de esto no hay factura que valga: una foto movida o un objeto
-// cualquiera devuelve cero o unos pocos caracteres sueltos. cortar aqui evita
-// gastar una peticion de la cuota del modelo en algo que no se puede leer
+// umbral para confiar en el OCR. por debajo de esto lo que saco Vision no da
+// para interpretar una factura, asi que se prefiere mandarle la imagen al
+// modelo en vez de trabajar con texto incompleto
 const MINIMO_CARACTERES_OCR = 25
 
 // el chat (app/api/chat/route.ts) usa gemini-2.5-flash. la cuota gratis es de 20
@@ -83,22 +83,27 @@ export async function POST(req: Request) {
     const categorias: string[] = categoriasRaw ? JSON.parse(categoriasRaw) : []
     const bytes = Buffer.from(await imagen.arrayBuffer())
 
-    // paso 1: OCR con Cloud Vision. si Vision no esta disponible (API sin
-    // habilitar, credenciales, red) se deja en null y mas abajo se cae al modo
-    // anterior de mandarle la imagen completa al modelo, para que la funcion
-    // siga sirviendo aunque Vision falle
+    // paso 1: OCR con Cloud Vision.
+    //
+    // Vision no siempre saca texto util: una factura arrugada, con poca luz o
+    // impresa en termico descolorido puede darle muy poco. Eso NO significa que
+    // la imagen no sirva, porque el modelo multimodal muchas veces si la lee.
+    // Por eso el OCR es solo un atajo barato: si devuelve texto suficiente se
+    // usa, y si no (texto corto, vacio, o Vision caido) se manda la imagen
+    // completa al modelo como antes. Nunca se rechaza una imagen aqui: quien
+    // decide si es factura o no es el modelo, mas abajo.
     let textoFactura: string | null = null
     try {
-      textoFactura = await leerTextoFactura(bytes)
-      console.log(`Vision: ${textoFactura.length} caracteres extraidos`)
+      const texto = await leerTextoFactura(bytes)
+      console.log(`Vision: ${texto.length} caracteres extraidos`)
+
+      if (texto.length >= MINIMO_CARACTERES_OCR) {
+        textoFactura = texto
+      } else {
+        console.log('Vision saco poco texto, se manda la imagen completa al modelo')
+      }
     } catch (error) {
       console.error('Vision fallo, se manda la imagen completa al modelo:', error)
-    }
-
-    // Vision respondio pero la imagen no tiene texto legible: no hace falta
-    // molestar al modelo para saber que esto no es una factura
-    if (textoFactura !== null && textoFactura.length < MINIMO_CARACTERES_OCR) {
-      return NextResponse.json({ error: 'La imagen no parece ser una factura legible' }, { status: 422 })
     }
 
     const instruccionCategoria = categorias.length

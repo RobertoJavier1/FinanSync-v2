@@ -3,17 +3,18 @@
 // El modelo es el mismo; lo que cambia es cómo se autentica. La API key de AI
 // Studio es una llave suelta que no distingue quién la usa: cualquiera que la
 // tenga puede gastar la cuota. Vertex en cambio usa la cuenta de servicio del
-// proyecto (la misma de Storage y Vision) y pide un token OAuth de corta
+// proyecto finansync-runtime (la misma de Vision) y pide un token OAuth de corta
 // duración, así que el acceso se controla con IAM y se puede revocar.
 //
 // Requisitos en Google Cloud:
 //   - habilitar la API "Vertex AI" en el proyecto
 //   - dar a la cuenta de servicio el rol roles/aiplatform.user
 //
-// Variables de entorno (se reusan las de GCS, no hay credenciales nuevas):
-//   GCS_PROJECT_ID, GCS_CLIENT_EMAIL, GCS_PRIVATE_KEY
+// Variables de entorno (cuenta finansync-runtime, ver lib/google-auth.ts):
+//   GCP_RUNTIME_PROJECT_ID, GCP_RUNTIME_CLIENT_EMAIL, GCP_RUNTIME_PRIVATE_KEY
 //   VERTEX_LOCATION -> region del endpoint, por defecto us-central1
 import { GoogleAuth } from 'google-auth-library'
+import { credencialesRuntime, proyectoRuntime } from '@/lib/google-auth'
 
 const LOCATION = process.env.VERTEX_LOCATION || 'us-central1'
 
@@ -24,13 +25,7 @@ let auth: GoogleAuth | null = null
 function getAuth(): GoogleAuth {
   if (!auth) {
     auth = new GoogleAuth({
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: {
-        client_email: process.env.GCS_CLIENT_EMAIL,
-        // el .env guarda los saltos de línea como "\n" literal; hay que
-        // convertirlos a saltos de línea reales para que la clave sea válida
-        private_key: process.env.GCS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
+      ...credencialesRuntime(),
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     })
   }
@@ -51,9 +46,9 @@ function urlVertex(modelo: string, proyecto: string): string {
  * respuesta.
  */
 export async function llamarVertex(modelo: string, body: object): Promise<Response> {
-  const proyecto = process.env.GCS_PROJECT_ID
+  const proyecto = proyectoRuntime()
   if (!proyecto) {
-    throw new Error('Falta GCS_PROJECT_ID para llamar a Vertex AI')
+    throw new Error('Falta GCP_RUNTIME_PROJECT_ID para llamar a Vertex AI')
   }
 
   const token = await getAuth().getAccessToken()
