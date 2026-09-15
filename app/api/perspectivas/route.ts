@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
+import { llamarVertex } from '@/lib/vertex'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
-
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
+// se llama por Vertex AI y no por la API key de AI Studio: la autenticacion es
+// con la cuenta de servicio finansync-runtime, controlada por IAM
+const MODELO = 'gemini-2.5-flash'
 
 export async function POST(req: Request) {
   try {
@@ -54,19 +55,16 @@ Responde ÚNICAMENTE con este JSON, sin texto adicional:
 }
 `
 
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
+    const res = await llamarVertex(MODELO, {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
     })
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('Error de Gemini:', err)
+      console.error('Error de Vertex AI:', err)
       return NextResponse.json({ error: 'Error al generar perspectivas' }, { status: 500 })
     }
+    console.log(`Vertex AI (${MODELO}): OK`)
 
     const data = await res.json()
     const text = data.candidates[0].content.parts[0].text
@@ -76,7 +74,7 @@ Responde ÚNICAMENTE con este JSON, sin texto adicional:
 
     return NextResponse.json({ perspectivas: parsed.perspectivas })
   } catch (error) {
-    console.error('Error llamando a Gemini:', error)
+    console.error('Error llamando a Vertex AI:', error)
     return NextResponse.json({ error: 'Error al generar perspectivas' }, { status: 500 })
   }
 }
