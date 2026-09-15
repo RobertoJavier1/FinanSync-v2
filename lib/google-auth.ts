@@ -18,7 +18,11 @@
 //   GCP_RUNTIME_PRIVATE_KEY   -> "private_key" del JSON, entre comillas dobles
 //                                y con los "\n" tal cual vienen
 
-export interface CredencialesSA {
+// se declara como "type" y no como "interface" a proposito: las librerias de
+// Google (ClientOptions, GoogleAuthOptions) llevan una firma de indice, y
+// TypeScript solo se la infiere a los type alias. Con interface, pasarle este
+// objeto al cliente de Vision no compila.
+export type CredencialesSA = {
   projectId: string | undefined
   credentials: {
     client_email: string | undefined
