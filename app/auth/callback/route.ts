@@ -21,7 +21,14 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
+      // en local, origin (derivado de request.url) ya es correcto. En Cloud
+      // Run, la petición llega al contenedor a través del proxy de Google, que
+      // reenvía el dominio público en x-forwarded-host en vez de dejar que
+      // request.url exponga la dirección interna del contenedor (0.0.0.0:8080)
+      const forwardedHost = request.headers.get('x-forwarded-host')
+      const esLocal = process.env.NODE_ENV === 'development'
+      const destino = !esLocal && forwardedHost ? `https://${forwardedHost}` : origin
+      return NextResponse.redirect(`${destino}${next}`)
     }
   }
 

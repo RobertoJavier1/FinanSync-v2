@@ -12,7 +12,8 @@
 // para que las dos librerías de IA lean las mismas variables y no se repita
 // el arreglo de los saltos de línea de la clave privada.
 //
-// Variables de entorno:
+// Variables de entorno (solo hacen falta en desarrollo local; en Cloud Run no
+// se configuran, ver más abajo):
 //   GCP_RUNTIME_PROJECT_ID    -> "project_id" del JSON de la cuenta
 //   GCP_RUNTIME_CLIENT_EMAIL  -> "client_email" del JSON
 //   GCP_RUNTIME_PRIVATE_KEY   -> "private_key" del JSON, entre comillas dobles
@@ -24,9 +25,9 @@
 // objeto al cliente de Vision no compila.
 export type CredencialesSA = {
   projectId: string | undefined
-  credentials: {
-    client_email: string | undefined
-    private_key: string | undefined
+  credentials?: {
+    client_email: string
+    private_key: string
   }
 }
 
@@ -34,33 +35,26 @@ export type CredencialesSA = {
  * Devuelve las credenciales de la cuenta de runtime en el formato que esperan
  * las librerías de Google (@google-cloud/vision, google-auth-library).
  *
- * Mientras no estén configuradas las variables de runtime cae a las de Storage
- * para que el entorno de desarrollo siga funcionando, pero avisa en consola:
- * en producción las dos cuentas deben estar separadas.
+ * Si no están configuradas las variables GCP_RUNTIME_*, no arma ningún objeto
+ * de credenciales: las librerías de Google caen solas a las Application
+ * Default Credentials (ADC) del entorno. En Cloud Run, esas ADC son la
+ * identidad de la cuenta de servicio asignada al servicio (ver el deploy),
+ * así que no hace falta ninguna llave privada en las variables de entorno de
+ * producción. En local, ADC solo funciona si corriste
+ * `gcloud auth application-default login`; si no, hay que poner las tres
+ * variables GCP_RUNTIME_* en .env.local.
  */
 export function credencialesRuntime(): CredencialesSA {
-  const proyecto = process.env.GCP_RUNTIME_PROJECT_ID
+  const proyecto = process.env.GCP_RUNTIME_PROJECT_ID ?? process.env.GCS_PROJECT_ID
   const email = process.env.GCP_RUNTIME_CLIENT_EMAIL
   const clave = process.env.GCP_RUNTIME_PRIVATE_KEY
 
   if (!email || !clave) {
-    console.warn(
-      'GCP_RUNTIME_* no está configurada; usando la cuenta de Storage como respaldo. ' +
-      'Configura la cuenta finansync-runtime antes de desplegar.',
-    )
-    return {
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: {
-        client_email: process.env.GCS_CLIENT_EMAIL,
-        // el .env guarda los saltos de línea como "\n" literal; hay que
-        // convertirlos a saltos de línea reales para que la clave sea válida
-        private_key: process.env.GCS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-    }
+    return { projectId: proyecto }
   }
 
   return {
-    projectId: proyecto ?? process.env.GCS_PROJECT_ID,
+    projectId: proyecto,
     credentials: {
       client_email: email,
       private_key: clave.replace(/\\n/g, '\n'),
