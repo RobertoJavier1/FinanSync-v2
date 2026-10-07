@@ -1,15 +1,32 @@
 steps:
+  # 1. Construye la imagen, etiquetada con el hash corto del commit
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
       - '-t'
-      - '${_IMAGE}'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/finansync/app:$SHORT_SHA'
       - '--build-arg'
       - 'NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}'
       - '--build-arg'
       - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=${_SUPABASE_ANON_KEY}'
       - '.'
+  # 2. Sube la imagen a Artifact Registry (tiene que existir antes del deploy)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/finansync/app:$SHORT_SHA'
+
+  # 3. Despliega una nueva revision en Cloud Run con esa imagen
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'finansync'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/finansync/app:$SHORT_SHA'
+      - '--region=us-central1'
+
 images:
-  - '${_IMAGE}'
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/finansync/app:$SHORT_SHA'
 options:
   logging: CLOUD_LOGGING_ONLY
