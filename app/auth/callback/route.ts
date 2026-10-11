@@ -14,8 +14,15 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // permite volver a la página desde la que se inició el login
-  const next = searchParams.get('next') ?? '/dashboard'
+  // permite volver a la página desde la que se inició el login. Solo se acepta
+  // una ruta interna: si next fuera "@evil.com" o "//evil.com", el redirect de
+  // abajo terminaría en otro dominio (open redirect). "/\" se rechaza porque
+  // algunos navegadores lo tratan como "//"
+  const nextParam = searchParams.get('next') ?? ''
+  const next =
+    nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\')
+      ? nextParam
+      : '/dashboard'
 
   if (code) {
     const supabase = await createClient()

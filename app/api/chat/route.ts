@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
@@ -71,6 +72,14 @@ Usa estos datos reales para dar respuestas personalizadas y específicas al usua
 
 export async function POST(req: Request) {
   try {
+    // el middleware ya exige sesion, pero se valida tambien aqui para que la
+    // ruta no dependa de una sola barrera (gasta cuota de Gemini)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const { messages, contexto }: { messages: Message[]; contexto: ContextoFinanciero | null } =
       await req.json()
 

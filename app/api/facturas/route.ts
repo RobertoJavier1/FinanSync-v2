@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { leerTextoFactura } from '@/lib/vision'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
@@ -72,6 +73,14 @@ async function llamarGemini(body: object): Promise<Response> {
 
 export async function POST(req: Request) {
   try {
+    // el middleware ya exige sesion, pero se valida tambien aqui para que la
+    // ruta no dependa de una sola barrera (gasta cuota de Vision y Gemini)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     const formData = await req.formData()
     const imagen = formData.get('imagen') as File | null
     const categoriasRaw = formData.get('categorias') as string | null

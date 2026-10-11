@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { llamarVertex } from '@/lib/vertex'
 
 // se llama por Vertex AI y no por la API key de AI Studio: la autenticacion es
@@ -7,6 +8,14 @@ const MODELO = 'gemini-2.5-flash'
 
 export async function POST(req: Request) {
   try {
+    // el middleware ya exige sesion, pero se valida tambien aqui para que la
+    // ruta no dependa de una sola barrera (gasta cuota de Vertex AI)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
     // recibe los datos financieros del mes enviados desde perspectivas-ia/page.tsx
     const { ingresos, gastos, categorias, presupuestos, metas, moneda = 'GTQ' } = await req.json()
 

@@ -23,9 +23,14 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+
+# El proceso corre como el usuario "node" (sin privilegios) y no como root: si
+# alguien lograra ejecutar codigo dentro del contenedor, tendria permisos
+# limitados. La imagen node:alpine ya trae este usuario.
+USER node
 
 # Cloud Run inyecta PORT (normalmente 8080) y espera que el contenedor
 # escuche en ese puerto; el server.js de la salida standalone ya lo respeta.
