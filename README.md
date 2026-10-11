@@ -10,8 +10,7 @@ Esta es la entrega **Proyecto Final** del curso Full Stack Web & Mobile con Inte
 
 ## 🌐 Live Demo
 
-**[https://finan-sync-dun.vercel.app/](https://finan-sync-dun.vercel.app/)**
-
+**[https://finansync.me](https://finansync.me)** — desplegada en Google Cloud Run con dominio propio.
 ---
 
 ## 🎬 Video demo
@@ -86,8 +85,7 @@ GEMINI_API_KEY=tu_clave_de_Google_AI_Studio
 3. **Authentication → Providers → Google** ✅ pegando el Client ID y Client Secret de Google Cloud Console.
 4. **Authentication → URL Configuration → Redirect URLs**, agregar:
    - `http://localhost:3000/auth/callback`
-   - `https://TU-DOMINIO.vercel.app/auth/callback`
-
+   - `https://finansync.me/auth/callback`
 ### 5. Ejecutar en desarrollo
 
 ```bash
