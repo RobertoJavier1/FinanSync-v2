@@ -1,25 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { leerTextoFactura } from '@/lib/vision'
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
+import { llamarVertex } from '@/lib/vertex'
 
 // umbral para confiar en el OCR. por debajo de esto lo que saco Vision no da
 // para interpretar una factura, asi que se prefiere mandarle la imagen al
 // modelo en vez de trabajar con texto incompleto
 const MINIMO_CARACTERES_OCR = 25
 
-// el chat (app/api/chat/route.ts) usa gemini-2.5-flash. la cuota gratis es de 20
-// peticiones/dia POR MODELO (no compartida entre modelos), asi que facturas usa
-// otros modelos primero para no competir por la misma cuota que el chat, y deja
-// 2.5-flash como ultimo recurso. lista confirmada contra /v1beta/models (algunos
-// nombres como gemini-1.5-flash, gemini-2.0-flash y gemini-2.5-flash-lite ya no
-// estan disponibles para esta cuenta)
-const GEMINI_MODELOS = ['gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.5-flash'] as const
-
-function urlGemini(modelo: string): string {
-  return `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${GEMINI_API_KEY}`
-}
+// la lista de respaldo se acorto al pasar a Vertex AI. con la API key de AI
+// Studio cada modelo tenia su propia cuota diaria gratuita y agotarla era lo
+// normal, asi que se probaban tres modelos distintos. en Vertex el consumo se
+// cobra por token contra el proyecto y no hay cuota diaria que agotar, de modo
+// que el unico caso que queda por cubrir es que el modelo este saturado (503).
+// se deja un segundo modelo por si eso pasa
+const MODELOS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] as const
 
 interface FacturaExtraida {
   es_factura: boolean
@@ -37,31 +32,27 @@ function limpiarJSON(texto: string): string {
 
 // prueba cada modelo en orden. dentro de un mismo modelo reintenta solo errores
 // de servidor (5xx, ej. 503 "high demand"), con una espera corta entre intentos.
-// un 429 (cuota de ESE modelo agotada) o cualquier otro 4xx no se arregla
-// reintentando el mismo modelo, asi que pasa directo al siguiente
-async function llamarGemini(body: object): Promise<Response> {
+// un 4xx no se arregla reintentando el mismo modelo (404 = ese modelo no existe
+// en la region, 429 = limite de peticiones), asi que pasa directo al siguiente
+async function llamarModelo(body: object): Promise<Response> {
   let ultimaRespuesta: Response | null = null
 
-  for (const modelo of GEMINI_MODELOS) {
+  for (const modelo of MODELOS) {
     for (let intento = 1; intento <= 2; intento++) {
-      const respuesta = await fetch(urlGemini(modelo), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      const respuesta = await llamarVertex(modelo, body)
 
       if (respuesta.ok) {
-        console.log(`Gemini (${modelo}): OK`)
+        console.log(`Vertex AI (${modelo}): OK`)
         return respuesta
       }
       ultimaRespuesta = respuesta
 
       if (respuesta.status < 500) {
-        console.error(`Gemini (${modelo}) status ${respuesta.status}, pasando al siguiente modelo:`, await respuesta.clone().text())
-        break // 429/4xx: no reintentar, pasar al siguiente modelo
+        console.error(`Vertex AI (${modelo}) status ${respuesta.status}, pasando al siguiente modelo:`, await respuesta.clone().text())
+        break
       }
 
-      console.error(`Gemini (${modelo}) error, intento ${intento}/2:`, await respuesta.clone().text())
+      console.error(`Vertex AI (${modelo}) error, intento ${intento}/2:`, await respuesta.clone().text())
       if (intento < 2) await new Promise((r) => setTimeout(r, 1000))
     }
   }
@@ -74,7 +65,7 @@ async function llamarGemini(body: object): Promise<Response> {
 export async function POST(req: Request) {
   try {
     // el middleware ya exige sesion, pero se valida tambien aqui para que la
-    // ruta no dependa de una sola barrera (gasta cuota de Vision y Gemini)
+    // ruta no dependa de una sola barrera (cada llamada a Vision y a Vertex se cobra)
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -154,13 +145,13 @@ Si la imagen está borrosa, incompleta o no es una factura, responde con "es_fac
           { inline_data: { mime_type: imagen.type || 'image/jpeg', data: bytes.toString('base64') } },
         ]
 
-    const res = await llamarGemini({
+    const res = await llamarModelo({
       contents: [{ role: 'user', parts: partes }],
     })
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('Gemini error:', err)
+      console.error('Error de Vertex AI:', err)
       return NextResponse.json({ error: 'Error al analizar la factura' }, { status: 500 })
     }
 
@@ -171,7 +162,7 @@ Si la imagen está borrosa, incompleta o no es una factura, responde con "es_fac
     try {
       resultado = JSON.parse(limpiarJSON(textoRespuesta))
     } catch {
-      console.error('No se pudo parsear la respuesta de Gemini:', textoRespuesta)
+      console.error('No se pudo parsear la respuesta del modelo:', textoRespuesta)
       return NextResponse.json({ error: 'No se pudo leer la factura, intenta con otra imagen' }, { status: 422 })
     }
 
