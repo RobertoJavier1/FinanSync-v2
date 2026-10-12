@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { llamarVertex } from '@/lib/vertex'
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`
+// se llama por Vertex AI y no por la API key de AI Studio: la autenticacion es
+// con la cuenta de servicio finansync-runtime, controlada por IAM
+const MODELO = 'gemini-2.5-flash'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -73,7 +75,7 @@ Usa estos datos reales para dar respuestas personalizadas y específicas al usua
 export async function POST(req: Request) {
   try {
     // el middleware ya exige sesion, pero se valida tambien aqui para que la
-    // ruta no dependa de una sola barrera (gasta cuota de Gemini)
+    // ruta no dependa de una sola barrera (cada llamada a Vertex se cobra)
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -89,23 +91,21 @@ export async function POST(req: Request) {
       parts: [{ text: msg.content }],
     }))
 
-    // system_instruction es el campo de gemini para el prompt del sistema, va separado del historial
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: buildSystemPrompt(contexto) }] },
-        contents,
-      }),
+    // systemInstruction lleva el prompt del sistema, separado del historial. en
+    // Vertex el campo va en camelCase, no en snake_case como en AI Studio
+    const res = await llamarVertex(MODELO, {
+      systemInstruction: { parts: [{ text: buildSystemPrompt(contexto) }] },
+      contents,
     })
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('Gemini error:', err)
+      console.error('Error de Vertex AI:', err)
       return NextResponse.json({ error: 'Error al procesar tu mensaje' }, { status: 500 })
     }
+    console.log(`Vertex AI (${MODELO}): OK`)
 
-    // la respuesta de gemini viene en candidates[0].content.parts[0].text
+    // la respuesta viene en candidates[0].content.parts[0].text
     const data = await res.json()
     const reply: string = data.candidates[0].content.parts[0].text
     return NextResponse.json({ reply })
