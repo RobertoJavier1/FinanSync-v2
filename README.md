@@ -67,12 +67,16 @@ cp .env.local.example .env.local
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
 
-# Gemini
-GEMINI_API_KEY=tu_clave_de_Google_AI_Studio
+# Cuenta de servicio de runtime (Vision y Vertex AI)
+GCP_RUNTIME_PROJECT_ID=finansync-74cd1
+GCP_RUNTIME_CLIENT_EMAIL=finansync-runtime@...iam.gserviceaccount.com
+GCP_RUNTIME_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 **Supabase:** en [supabase.com/dashboard](https://supabase.com/dashboard) abrir el proyecto → *Project Settings* → *API* y copiar la URL y la clave `anon`.
-**Gemini:** obtener la clave gratis en [Google AI Studio](https://aistudio.google.com/) seleccionando el modelo `gemini-2.5-flash`.
+**Cuenta de servicio:** en la consola de Google Cloud, *IAM y administración* → *Cuentas de servicio* → `finansync-runtime` → *Claves* → *Agregar clave* → JSON. Del archivo descargado se copian `project_id`, `client_email` y `private_key`. Esa cuenta necesita habilitadas las APIs de Cloud Vision y Vertex AI, y el rol *Usuario de Vertex AI*.
+
+> En Cloud Run estas tres variables no se configuran: el servicio se ejecuta con la identidad de la cuenta de servicio y obtiene las credenciales del entorno, así que no hay ninguna llave guardada.
 
 > La clave `anon` es pública por diseño: quien limita el acceso a los datos son las políticas RLS. La `service_role` key nunca debe ponerse en una variable `NEXT_PUBLIC_`.
 >
@@ -202,6 +206,10 @@ El endpoint `/api/tipo-cambio` consulta la API pública de jsDelivr y cachea las
 ---
 
 ## 🤖 Integración con Gemini 2.5 Flash
+
+Las tres llamadas al modelo (`/api/chat`, `/api/perspectivas` y `/api/facturas`) pasan por **Vertex AI**, no por la API key de Google AI Studio. La autenticación la hace la cuenta de servicio `finansync-runtime` mediante un token OAuth de corta duración, de modo que el acceso se controla con IAM y puede revocarse sin tocar el código. El módulo `lib/vertex.ts` concentra esa llamada.
+
+En la lectura de facturas, antes de llegar al modelo la imagen pasa por **Cloud Vision**, que extrae el texto. Solo ese texto se envía a interpretar, lo que reduce el consumo de tokens; si Vision saca poco texto o no está disponible, se envía la imagen completa como respaldo.
 
 **Sugerencias de ahorro (Dashboard)**  
 El endpoint `/api/perspectivas` recibe el contexto financiero del usuario y devuelve 4 sugerencias en formato `N.emoji|título|consejo`. Respeta el toggle `recomendacionesIA` de Configuración.
