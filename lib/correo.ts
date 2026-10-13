@@ -23,7 +23,7 @@ export interface CorreoEnviado {
   detalle?: string
 }
 
-const REMITENTE = process.env.CORREO_REMITENTE || 'FinanSync <onboarding@resend.dev>'
+const REMITENTE = process.env.CORREO_REMITENTE || 'FinanSync <reportes@finansync.me>'
 
 export async function enviarCorreo(opciones: {
   para: string
