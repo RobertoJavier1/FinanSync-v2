@@ -73,6 +73,7 @@ export async function POST(req: Request) {
 
   const inicio = Date.now()
   let enviados = 0
+  let sinMovimientos = 0
   let omitidos = 0
   let fallidos = 0
 
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
 
         // sin movimientos no hay nada que reportar; mandar un PDF vacío solo molesta
         if (datos.movimientos === 0) {
-          omitidos++
+          sinMovimientos++
           continue
         }
 
@@ -120,12 +121,19 @@ export async function POST(req: Request) {
       }
     }
 
-    const resumen = { evento: 'reporte_mensual_fin', anio, mes, enviados, omitidos, fallidos, ms: Date.now() - inicio }
+    // se separan a proposito: "sin movimientos" es el caso normal de un usuario
+    // que no registro nada ese mes, "omitidos" significa que habia que mandarle
+    // el correo y no se mando (por ejemplo, sin proveedor configurado)
+    const resumen = {
+      evento: 'reporte_mensual_fin',
+      anio, mes, enviados, sinMovimientos, omitidos, fallidos,
+      ms: Date.now() - inicio,
+    }
     console.log(JSON.stringify(resumen))
 
     // si fallaron todos hay un problema real: se devuelve 500 para que la alerta
     // de Cloud Monitoring lo note y Cloud Scheduler marque el intento como fallido
-    const todosFallaron = fallidos > 0 && enviados === 0 && omitidos === 0
+    const todosFallaron = fallidos > 0 && enviados === 0 && omitidos === 0 && sinMovimientos === 0
     return NextResponse.json(resumen, { status: todosFallaron ? 500 : 200 })
   } catch (error) {
     console.error(JSON.stringify({ evento: 'reporte_mensual_error', error: String(error) }))
