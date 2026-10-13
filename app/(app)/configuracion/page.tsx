@@ -43,7 +43,8 @@ export default function ConfiguracionPage() {
     setNotifPresupuesto(notif.presupuesto)
     setNotifMetas(notif.metas)
     setNotifIA(notif.ia)
-  }, [notif.presupuesto, notif.metas, notif.ia])
+    setNotifReporteMensual(notif.reporteMensual)
+  }, [notif.presupuesto, notif.metas, notif.ia, notif.reporteMensual])
 
   // sincroniza preferencias de finanzas cuando el contexto las carga de la base de datos
   useEffect(() => {
@@ -164,6 +165,7 @@ export default function ConfiguracionPage() {
   const [notifPresupuesto, setNotifPresupuesto] = useState(true)
   const [notifMetas, setNotifMetas] = useState(true)
   const [notifIA, setNotifIA] = useState(true)
+  const [notifReporteMensual, setNotifReporteMensual] = useState(true)
 
   // lista de categorias personalizadas con soporte para agregar y eliminar
   const [categorias, setCategorias] = useState(['Alimentación', 'Transporte', 'Entretenimiento', 'Salud', 'Educación', 'Vivienda', 'Ropa'])
@@ -306,6 +308,7 @@ export default function ConfiguracionPage() {
                   { label: 'Alertas de presupuesto', desc: 'Aviso cuando te acercas al límite de un presupuesto', value: notifPresupuesto, set: setNotifPresupuesto },
                   { label: 'Progreso de metas', desc: 'Actualizaciones sobre el avance de tus metas de ahorro', value: notifMetas, set: setNotifMetas },
                   { label: 'Recomendaciones IA', desc: 'Sugerencias personalizadas de Perspectivas IA', value: notifIA, set: setNotifIA },
+                  { label: 'Estado de cuenta mensual', desc: 'Recibe por correo el resumen del mes el día 1, con el detalle en PDF', value: notifReporteMensual, set: setNotifReporteMensual },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between gap-4 py-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                     <div>
@@ -327,7 +330,7 @@ export default function ConfiguracionPage() {
                   onClick={async () => {
                     setSaving(true)
                     try {
-                      await guardarNotif({ presupuesto: notifPresupuesto, metas: notifMetas, ia: notifIA })
+                      await guardarNotif({ presupuesto: notifPresupuesto, metas: notifMetas, ia: notifIA, reporteMensual: notifReporteMensual })
                       mostrar('ok', 'Preferencias de notificaciones guardadas.')
                     } catch {
                       mostrar('error', 'No se pudieron guardar las preferencias.')

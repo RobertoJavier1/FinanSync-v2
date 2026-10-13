@@ -9,6 +9,7 @@ export interface NotifState {
   presupuesto: boolean // true = mostrar alertas cuando se acerca al limite de presupuesto
   metas: boolean       // true = mostrar recordatorios de metas proximas a vencer
   ia: boolean          // true = cargar analisis automatico en Perspectivas IA al entrar
+  reporteMensual: boolean // true = recibir por correo el estado de cuenta del mes
 }
 
 // funciones y datos que el contexto expone a todas las paginas
@@ -20,14 +21,14 @@ interface NotifContextValue {
 
 // valor por defecto: todas las notificaciones activas antes de cargar el perfil
 const NotifContext = createContext<NotifContextValue>({
-  notif: { presupuesto: true, metas: true, ia: true },
+  notif: { presupuesto: true, metas: true, ia: true, reporteMensual: true },
   notifLoaded: false,
   guardar: async () => {},
 })
 
 export function NotifProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
-  const [notif, setNotif] = useState<NotifState>({ presupuesto: true, metas: true, ia: true })
+  const [notif, setNotif] = useState<NotifState>({ presupuesto: true, metas: true, ia: true, reporteMensual: true })
   const [notifLoaded, setNotifLoaded] = useState(false)
 
   // carga las preferencias de notificaciones del usuario desde usuarios
@@ -35,7 +36,7 @@ export function NotifProvider({ children }: { children: React.ReactNode }) {
     if (!user) return
     supabase
       .from('usuarios')
-      .select('notif_presupuesto, notif_metas, notif_ia')
+      .select('notif_presupuesto, notif_metas, notif_ia, notif_reporte_mensual')
       .eq('id_usuario', user.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -45,6 +46,7 @@ export function NotifProvider({ children }: { children: React.ReactNode }) {
             presupuesto: data.notif_presupuesto ?? true,
             metas: data.notif_metas ?? true,
             ia: data.notif_ia ?? true,
+            reporteMensual: data.notif_reporte_mensual ?? true,
           })
         }
         setNotifLoaded(true)
@@ -55,13 +57,14 @@ export function NotifProvider({ children }: { children: React.ReactNode }) {
   async function guardar(vals: NotifState) {
     if (!user) return
     setNotif(vals)
-    // solo se actualizan estas tres columnas; las de finanzas no se tocan
+    // solo se actualizan estas columnas de notificaciones; las de finanzas no se tocan
     const { error } = await supabase
       .from('usuarios')
       .update({
         notif_presupuesto: vals.presupuesto,
         notif_metas: vals.metas,
         notif_ia: vals.ia,
+        notif_reporte_mensual: vals.reporteMensual,
       })
       .eq('id_usuario', user.id)
 

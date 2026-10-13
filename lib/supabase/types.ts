@@ -22,6 +22,7 @@ export interface Database {
           notif_presupuesto: boolean
           notif_metas: boolean
           notif_ia: boolean
+          notif_reporte_mensual: boolean
           // la mantiene el trigger categorias_sincronizar; solo lectura
           categorias: string[]
           creado_en: string
@@ -34,6 +35,7 @@ export interface Database {
           notif_presupuesto?: boolean
           notif_metas?: boolean
           notif_ia?: boolean
+          notif_reporte_mensual?: boolean
         }
         Update: {
           nombre?: string | null
@@ -42,6 +44,7 @@ export interface Database {
           notif_presupuesto?: boolean
           notif_metas?: boolean
           notif_ia?: boolean
+          notif_reporte_mensual?: boolean
         }
         Relationships: []
       }
