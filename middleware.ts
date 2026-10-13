@@ -9,7 +9,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // rutas accesibles sin sesión
-const RUTAS_PUBLICAS = ['/', '/registrarse', '/auth/callback']
+//
+// /api/reportes/mensual lo dispara Cloud Scheduler, que no tiene sesión de
+// usuario: esa ruta se autoriza sola verificando el token OIDC de Google o el
+// token compartido, no con la cookie de Supabase.
+const RUTAS_PUBLICAS = ['/', '/registrarse', '/auth/callback', '/api/reportes/mensual']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request })
