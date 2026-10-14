@@ -1,0 +1,24 @@
+{
+  "displayName": "FinanSync — fallo del reporte mensual",
+  "documentation": {
+    "content": "El job del estado de cuenta mensual registró un error. Revisar los logs de Cloud Run filtrando por jsonPayload.evento para ver si falló el job completo (reporte_mensual_error) o solo un usuario (reporte_mensual_error_usuario).",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Error registrado por el job del reporte mensual",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"finansync\" AND severity>=ERROR AND jsonPayload.evento=~\"^reporte_mensual_error\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "604800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}

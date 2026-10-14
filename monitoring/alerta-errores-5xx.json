@@ -1,0 +1,33 @@
+{
+  "displayName": "FinanSync — errores 5xx en Cloud Run",
+  "documentation": {
+    "content": "El servicio está devolviendo errores de servidor. Puede ser una falla de Vertex AI, de Cloud Vision o de la base de datos. Revisar los logs de la revisión activa.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Más de 5 respuestas 5xx en 5 minutos",
+      "conditionThreshold": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"finansync\" AND metric.type=\"run.googleapis.com/request_count\" AND metric.labels.response_code_class=\"5xx\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 5,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "604800s"
+  },
+  "enabled": true,
+  "notificationChannels": []
+}
