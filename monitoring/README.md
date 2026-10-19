@@ -7,17 +7,18 @@ carpeta.
 ## Eventos que registra la aplicación
 
 El código no escribe texto suelto: imprime JSON en una sola línea, que es como
-Cloud Logging lo puede indexar y filtrar por campo. Todos los eventos del job
-mensual llevan la clave `evento`:
+Cloud Logging lo puede indexar y filtrar por campo. Cada línea lleva la clave
+`evento` y un campo `severity`, que es el que Cloud Logging usa para clasificar
+la entrada. Sin ese campo todo entraría como INFO, aunque se haya escrito por
+la salida de error.
 
-| Evento | Cuándo | Severidad |
+| Evento | Cuándo | severity |
 |---|---|---|
 | `reporte_mensual_inicio` | arranca el job, con cuántos usuarios va a procesar | INFO |
 | `reporte_mensual_fin` | termina, con enviados / sin movimientos / omitidos / fallidos y cuánto tardó | INFO |
 | `reporte_mensual_error_usuario` | falló un usuario; el resto sigue | ERROR |
 | `reporte_mensual_error` | falló el job completo | ERROR |
-| `reporte_mensual_rechazado` | alguien llamó al endpoint sin un token válido | ERROR |
-| `correo_omitido` | no hay proveedor de correo configurado | INFO |
+| `reporte_mensual_rechazado` | se llamó al endpoint sin credenciales válidas, con el motivo del rechazo | ERROR |
 
 Para verlos en la consola, en Cloud Logging:
 
@@ -27,17 +28,40 @@ resource.labels.service_name="finansync"
 jsonPayload.evento="reporte_mensual_fin"
 ```
 
+## Quién puede llamar al endpoint
+
+El job solo acepta dos cosas: el token OIDC que firma Cloud Scheduler con la
+cuenta de servicio de `REPORTE_SERVICE_ACCOUNT`, o el token compartido de
+`REPORTE_CRON_TOKEN` en la cabecera `x-cron-token`.
+
+`REPORTE_SERVICE_ACCOUNT` no es opcional. Si no está configurada, el endpoint
+rechaza cualquier token OIDC, porque verificar solo la firma dejaría pasar el
+token de cualquier cuenta de Google. En Cloud Run se configura así:
+
+```bash
+gcloud run services update finansync --region=us-central1 \
+  --update-env-vars="REPORTE_SERVICE_ACCOUNT=finansync-runtime@finansync-74cd1.iam.gserviceaccount.com"
+```
+
+Después conviene forzar una ejecución del job `estado-cuenta-mensual` desde
+Cloud Scheduler: tiene que seguir terminando sin errores.
+
 ## Alertas
 
 Dos políticas, en los archivos de esta carpeta:
 
-**`alerta-reporte-mensual.json`** — avisa si el job del estado de cuenta
-registra un error. Es la que importa: el job corre una vez al mes, así que si
-falla y nadie se entera, el mes se pierde. Se limita a un aviso por hora para
-que un fallo con muchos usuarios no mande cien correos.
+**`alerta-reporte-mensual.json`** — avisa cuando aparece un
+`reporte_mensual_error`, un `reporte_mensual_error_usuario` o un
+`reporte_mensual_rechazado`. Es la que importa: el job corre una vez al mes, así
+que si falla y nadie se entera, el mes se pierde. Se limita a un aviso por hora
+para que un fallo con muchos usuarios no mande cien correos.
 
 **`alerta-errores-5xx.json`** — avisa si el servicio pasa de cinco respuestas
 5xx en cinco minutos. Cubre caídas de Vertex AI, de Cloud Vision o de la base.
+
+El filtro de la primera busca por `jsonPayload.evento` y no por severidad, a
+propósito: así sigue funcionando aunque cambie cómo se clasifica la línea, y no
+se dispara con errores de otra parte del servicio.
 
 ## Cómo crearlas
 
@@ -48,11 +72,13 @@ gcloud beta monitoring channels create \
   --display-name="Correo del equipo" \
   --type=email \
   --channel-labels=email_address=TU_CORREO \
-  --project=finansync-74cd1
+  --project=finansync-74cd1 \
+  --format="value(name)"
 ```
 
-Ese comando devuelve el id del canal. Se copia dentro de `notificationChannels`
-en los dos JSON, y después:
+Ese comando devuelve el id del canal, algo como
+`projects/finansync-74cd1/notificationChannels/1234567890`. Se copia dentro de
+`notificationChannels` en los dos JSON, y después:
 
 ```bash
 gcloud alpha monitoring policies create \
@@ -66,14 +92,26 @@ gcloud alpha monitoring policies create \
 
 Si se dejan los `notificationChannels` vacíos, las políticas igual se crean y se
 ven en la consola, pero no avisan a nadie: solo quedan registradas como
-incidentes.
+incidentes. Para comprobar que quedaron creadas:
+
+```bash
+gcloud alpha monitoring policies list --project=finansync-74cd1
+gcloud beta monitoring channels list --project=finansync-74cd1
+```
 
 ## Cómo probar que la alerta sirve
 
-Llamar al endpoint mensual con un token incorrecto genera un
-`reporte_mensual_rechazado` con severidad ERROR, que es la forma más rápida de
-ver un registro de error entrando a Cloud Logging sin romper nada:
+Hay que provocar un rechazo que deje registro. Un token OIDC inválido lo hace:
 
 ```bash
-curl -X POST "https://URL-DE-CLOUD-RUN/api/reportes/mensual" -H "x-cron-token: incorrecto"
+curl -s -X POST \
+  "https://finansync-1088114787810.us-central1.run.app/api/reportes/mensual" \
+  -H "Authorization: Bearer token-falso"
 ```
+
+El endpoint devuelve 401 y escribe un `reporte_mensual_rechazado` con motivo
+`token invalido`. Entre cinco y diez minutos después tiene que llegar el correo
+de la alerta.
+
+Mandar la cabecera `x-cron-token` con un valor incorrecto también deja el mismo
+registro, con motivo `token compartido incorrecto`.

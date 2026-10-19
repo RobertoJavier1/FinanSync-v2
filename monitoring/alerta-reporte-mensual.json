@@ -1,7 +1,7 @@
 {
   "displayName": "FinanSync — fallo del reporte mensual",
   "documentation": {
-    "content": "El job del estado de cuenta mensual registró un error. Revisar los logs de Cloud Run filtrando por jsonPayload.evento para ver si falló el job completo (reporte_mensual_error) o solo un usuario (reporte_mensual_error_usuario).",
+    "content": "El job del estado de cuenta mensual registró un error o rechazó una llamada. Revisar los logs de Cloud Run filtrando por jsonPayload.evento para ver si falló el job completo (reporte_mensual_error), solo un usuario (reporte_mensual_error_usuario) o si alguien llamó al endpoint sin credenciales válidas (reporte_mensual_rechazado).",
     "mimeType": "text/markdown"
   },
   "combiner": "OR",
@@ -9,7 +9,7 @@
     {
       "displayName": "Error registrado por el job del reporte mensual",
       "conditionMatchedLog": {
-        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"finansync\" AND severity>=ERROR AND jsonPayload.evento=~\"^reporte_mensual_error\""
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"finansync\" AND jsonPayload.evento=~\"^reporte_mensual_(error|rechazado)\""
       }
     }
   ],
