@@ -5,15 +5,17 @@ import Link from 'next/link'
 import { Search, Trash2, Plus, ArrowUpRight, ArrowDownRight, Receipt, X } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { useConfirmar } from '@/context/ConfirmContext'
 import { usePeriodo } from '@/context/PeriodoContext'
 import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { useQueryClient } from '@tanstack/react-query'
-import { eliminarTransaccion, obtenerUrlFactura } from '@/lib/transacciones'
+import { eliminarTransaccion, obtenerUrlFactura, Transaccion } from '@/lib/transacciones'
 import SelectorMes from '@/components/SelectorMes'
 
 export default function TransaccionesPage() {
   const { user } = useAuth()
   const { formatear, convertir, finanzas } = useFinanzas()
+  const confirmar = useConfirmar()
   const { mes, anio, mesNombre } = usePeriodo()
   const { data: transactions = [], isLoading: loading } = useTransaccionesPorMes(user?.id, mes, anio)
   const queryClient = useQueryClient()
@@ -26,9 +28,15 @@ export default function TransaccionesPage() {
 
   // elimina en la base de datos y le avisa al cache que ese usuario debe refrescar sus transacciones.
   // el prefijo ['transacciones', user.id] invalida tambien la version por mes (['transacciones', user.id, mes, anio])
-  async function handleEliminar(id: string) {
+  // se borra de la base sin forma de deshacer, por eso se confirma antes
+  async function handleEliminar(t: Transaccion) {
     if (!user) return
-    await eliminarTransaccion(user.id, id)
+    const ok = await confirmar({
+      titulo: '¿Eliminar transacción?',
+      mensaje: `"${t.descripcion}" por ${formatear(t.monto, t.monedaOrigen)}. Esta acción no se puede deshacer.`,
+    })
+    if (!ok) return
+    await eliminarTransaccion(user.id, t.id)
     queryClient.invalidateQueries({ queryKey: ['transacciones', user.id] })
   }
 
@@ -154,7 +162,7 @@ export default function TransaccionesPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleEliminar(t.id)}
+                  onClick={() => handleEliminar(t)}
                   className="text-red-400 hover:text-red-600 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />

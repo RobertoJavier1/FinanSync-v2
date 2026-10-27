@@ -5,12 +5,13 @@ import { Plus, Trash2, X, TrendingDown, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { useConfirmar } from '@/context/ConfirmContext'
 import { usePeriodo } from '@/context/PeriodoContext'
 
 const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
 }
-import { agregarPresupuesto, eliminarPresupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
+import { agregarPresupuesto, eliminarPresupuesto, Presupuesto, COLORES_PRESUPUESTO, ICONOS_PRESUPUESTO } from '@/lib/presupuestos'
 import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { usePresupuestos } from '@/hooks/usePresupuestos'
 import { useQueryClient } from '@tanstack/react-query'
@@ -20,6 +21,7 @@ export default function PresupuestoPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir } = useFinanzas()
+  const confirmar = useConfirmar()
   const { mes, anio, mesNombre } = usePeriodo()
 
   const { data: presupuestos = [], isLoading: loading } = usePresupuestos(user?.id, mes, anio)
@@ -89,9 +91,15 @@ export default function PresupuestoPage() {
     }
   }
 
-  async function handleEliminar(id: string) {
+  // se borra de la base sin forma de deshacer, por eso se confirma antes
+  async function handleEliminar(budget: Presupuesto) {
     if (!user) return
-    await eliminarPresupuesto(id)
+    const ok = await confirmar({
+      titulo: '¿Eliminar presupuesto?',
+      mensaje: `Se eliminará el presupuesto de "${budget.categoria}". Esta acción no se puede deshacer.`,
+    })
+    if (!ok) return
+    await eliminarPresupuesto(budget.id)
     queryClient.invalidateQueries({ queryKey: ['presupuestos', user.id, mes, anio] })
   }
 
@@ -203,7 +211,7 @@ export default function PresupuestoPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleEliminar(budget.id)}
+                    onClick={() => handleEliminar(budget)}
                     className="text-red-400 hover:text-red-600 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />

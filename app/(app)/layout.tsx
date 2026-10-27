@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { NotifProvider } from '@/context/NotifContext'
 import { FinanzasProvider } from '@/context/FinanzasContext'
 import { PeriodoProvider } from '@/context/PeriodoContext'
+import { ConfirmProvider } from '@/context/ConfirmContext'
 import Sidebar from '@/components/layout/Sidebar'
 
 // layout protegido: todas las rutas dentro de (app) requieren sesion activa
@@ -40,7 +41,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <FinanzasProvider>
           <PeriodoProvider>
             <NotifProvider>
-              {children}
+              <ConfirmProvider>
+                {children}
+              </ConfirmProvider>
             </NotifProvider>
           </PeriodoProvider>
         </FinanzasProvider>

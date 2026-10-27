@@ -5,6 +5,7 @@ import { Plus, Calendar, X, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
+import { useConfirmar } from '@/context/ConfirmContext'
 
 const SIMBOLOS: Record<string, string> = {
   MXN: '$', USD: '$', EUR: '€', GTQ: 'Q', COP: '$', ARS: '$',
@@ -22,6 +23,7 @@ export default function MetasPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
   const { finanzas, formatear, convertir, convertirEntre } = useFinanzas()
+  const confirmar = useConfirmar()
   const { data: metas = [], isLoading: loading } = useMetas(user?.id)
   const { data: transactions = [] } = useTransacciones(user?.id)
   const queryClient = useQueryClient()
@@ -108,9 +110,16 @@ export default function MetasPage() {
     }
   }
 
-  async function handleEliminar(id: string) {
+  // se borra de la base sin forma de deshacer y con ella el progreso ahorrado,
+  // por eso se confirma antes mostrando cuanto se lleva
+  async function handleEliminar(meta: Meta) {
     if (!user) return
-    await eliminarMeta(id)
+    const ok = await confirmar({
+      titulo: '¿Eliminar meta?',
+      mensaje: `"${meta.nombre}" se eliminará junto con su progreso ahorrado (${formatear(meta.actual, meta.monedaOrigen)} de ${formatear(meta.objetivo, meta.monedaOrigen)}). Esta acción no se puede deshacer.`,
+    })
+    if (!ok) return
+    await eliminarMeta(meta.id)
     queryClient.invalidateQueries({ queryKey: ['metas', user.id] })
   }
 
@@ -319,7 +328,7 @@ export default function MetasPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleEliminar(meta.id)}
+                    onClick={() => handleEliminar(meta)}
                     className="text-red-400 hover:text-red-600 transition-colors flex-shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />

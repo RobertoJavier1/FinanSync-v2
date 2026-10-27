@@ -5,6 +5,7 @@ import { User, Bell, Shield, Palette, DollarSign, Trash2, CheckCircle, XCircle, 
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
+import { useConfirmar } from '@/context/ConfirmContext'
 import { useNotif } from '@/context/NotifContext'
 import { useFinanzas } from '@/context/FinanzasContext'
 import { supabase } from '@/lib/supabase/client'
@@ -25,6 +26,7 @@ export default function ConfiguracionPage() {
   const router = useRouter()
   const { tema, setTema } = useTheme()
   const { notif, guardar: guardarNotif } = useNotif()
+  const confirmar = useConfirmar()
   const { finanzas, guardar: guardarFinanzas } = useFinanzas()
   const [activeTab, setActiveTab] = useState('perfil')
   const [saving, setSaving] = useState(false)
@@ -84,8 +86,12 @@ export default function ConfiguracionPage() {
 
   async function eliminarCuenta() {
     if (!user) return
-    const confirmar = window.confirm('¿Seguro que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')
-    if (!confirmar) return
+    const ok = await confirmar({
+      titulo: '¿Eliminar tu cuenta?',
+      mensaje: 'Se borrarán tu perfil, transacciones, presupuestos y metas. Esta acción no se puede deshacer.',
+      textoConfirmar: 'Eliminar cuenta',
+    })
+    if (!ok) return
     setSaving(true)
 
     // borrar de auth.users exige permisos de servicio, así que se delega en la
@@ -172,11 +178,13 @@ export default function ConfiguracionPage() {
 
   // borrar una categoria no es inocuo: al guardar se van con ella los
   // presupuestos de esa categoria, y sus transacciones quedan sin clasificar
-  function quitarCategoria(cat: string) {
-    const confirmar = window.confirm(
-      `¿Quitar la categoría "${cat}"?\n\nAl guardar se eliminarán los presupuestos de esta categoría y las transacciones que la usaban quedarán sin clasificar. El historial de montos no se pierde.`,
-    )
-    if (!confirmar) return
+  async function quitarCategoria(cat: string) {
+    const ok = await confirmar({
+      titulo: `¿Quitar la categoría "${cat}"?`,
+      mensaje: 'Al guardar se eliminarán los presupuestos de esta categoría y las transacciones que la usaban quedarán sin clasificar. El historial de montos no se pierde.',
+      textoConfirmar: 'Quitar',
+    })
+    if (!ok) return
     setCategorias(categorias.filter((c) => c !== cat))
   }
   const [nuevaCategoria, setNuevaCategoria] = useState('')
