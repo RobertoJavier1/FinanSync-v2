@@ -142,28 +142,77 @@ export function generarPdf(usuario: UsuarioReporte, datos: EstadoCuenta): Buffer
   pdf.setFont('helvetica', 'normal')
   pdf.setFontSize(9)
   pdf.setTextColor(100, 116, 139)
-  pdf.text(`${datos.movimientos} movimientos registrados en el mes`, margen, y)
-  y += 20
+  pdf.text(
+    datos.movimientos === 1
+      ? '1 movimiento registrado en el mes'
+      : `${datos.movimientos} movimientos registrados en el mes`,
+    margen,
+    y,
+  )
+  y += 30
+
+  // Las tres tablas comparten el mismo estilo. La alineación del encabezado se
+  // pone en la propia celda y no solo en columnStyles: el estilo de la celda es
+  // el que manda, y si se deja fuera, el título queda a la izquierda mientras
+  // la cifra se alinea a la derecha, que es lo que se veía descuadrado.
+  const derecha = (texto: string) => ({ content: texto, styles: { halign: 'right' as const } })
+
+  const estiloBase = {
+    margin: { left: margen, right: margen },
+    styles: { fontSize: 9, cellPadding: 5 },
+    headStyles: {
+      fillColor: [241, 245, 249] as [number, number, number],
+      textColor: [30, 41, 59] as [number, number, number],
+    },
+  }
+
+  const finDeTabla = () =>
+    (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY
+
+  /** Título de sección. Salta de página si ya no cabe la tabla debajo. */
+  function titulo(texto: string): void {
+    if (y > pdf.internal.pageSize.getHeight() - 140) {
+      pdf.addPage()
+      y = 56
+    }
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(11)
+    pdf.setTextColor(30, 41, 59)
+    pdf.text(texto, margen, y)
+    y += 10
+  }
+
+  /** Para cuando una sección no tiene filas: mejor decirlo que dejar el hueco. */
+  function vacio(texto: string): void {
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.setTextColor(148, 163, 184)
+    pdf.text(texto, margen, y + 12)
+    y += 36
+  }
 
   // gastos por categoria
+  titulo('Gastos por categoría')
   if (datos.categorias.length > 0) {
     autoTable(pdf, {
+      ...estiloBase,
       startY: y,
-      head: [['Categoría', 'Gastado']],
+      head: [['Categoría', derecha('Gastado')]],
       body: datos.categorias.map((c) => [c.categoria, monto(Number(c.total), usuario.moneda)]),
-      margin: { left: margen, right: margen },
-      styles: { fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59] },
       columnStyles: { 1: { halign: 'right' } },
     })
-    y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 24
+    y = finDeTabla() + 28
+  } else {
+    vacio('No se registraron gastos en el mes.')
   }
 
   // presupuestos del mes
+  titulo('Presupuestos del mes')
   if (datos.presupuestos.length > 0) {
     autoTable(pdf, {
+      ...estiloBase,
       startY: y,
-      head: [['Presupuesto', 'Límite', 'Gastado', 'Avance']],
+      head: [['Presupuesto', derecha('Límite'), derecha('Gastado'), derecha('Avance')]],
       body: datos.presupuestos.map((p) => {
         const limite = Number(p.limite)
         const gastado = Number(p.gastado)
@@ -175,19 +224,20 @@ export function generarPdf(usuario: UsuarioReporte, datos: EstadoCuenta): Buffer
           `${pct}%${pct > 100 ? ' (excedido)' : ''}`,
         ]
       }),
-      margin: { left: margen, right: margen },
-      styles: { fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59] },
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
     })
-    y = (pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 24
+    y = finDeTabla() + 28
+  } else {
+    vacio('No hay presupuestos configurados.')
   }
 
   // metas de ahorro
+  titulo('Metas de ahorro')
   if (datos.metas.length > 0) {
     autoTable(pdf, {
+      ...estiloBase,
       startY: y,
-      head: [['Meta', 'Objetivo', 'Ahorrado', 'Avance']],
+      head: [['Meta', derecha('Objetivo'), derecha('Ahorrado'), derecha('Avance')]],
       body: datos.metas.map((m) => {
         const objetivo = Number(m.objetivo)
         const actual = Number(m.actual)
@@ -199,11 +249,11 @@ export function generarPdf(usuario: UsuarioReporte, datos: EstadoCuenta): Buffer
           `${pct}%`,
         ]
       }),
-      margin: { left: margen, right: margen },
-      styles: { fontSize: 9, cellPadding: 5 },
-      headStyles: { fillColor: [241, 245, 249], textColor: [30, 41, 59] },
       columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
     })
+    y = finDeTabla() + 28
+  } else {
+    vacio('No hay metas de ahorro activas.')
   }
 
   // pie
