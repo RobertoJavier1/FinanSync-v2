@@ -2,9 +2,7 @@
 
 Aplicación web de finanzas personales construida con **Next.js 15 + React 18 + TypeScript + Tailwind CSS**, conectada a **Supabase (Postgres + Auth)** y desplegada en **Google Cloud Run**. Usa **Gemini 3.8 Flash** (vía Vertex AI) para el chat financiero, las perspectivas personalizadas y la lectura de facturas.
 
-Esta es la entrega **Proyecto Final** del curso Full Stack Web & Mobile con Integración de IA — Mayo 2026.
-
-> **Migración a Supabase.** La versión original usaba Firebase Auth + Cloud Firestore. Ahora el backend es Supabase: los datos viven en cinco tablas de Postgres (`usuarios`, `categorias`, `transacciones`, `metas`, `presupuestos`) con Row Level Security, y la autenticación usa Supabase Auth con sesión en cookies. El schema está en [`supabase/migrations/`](supabase/migrations/).
+Los datos viven en cinco tablas de Postgres con Row Level Security y el esquema completo está en [`supabase/migrations/`](supabase/migrations/).
 
 ---
 
@@ -20,11 +18,30 @@ Esta es la entrega **Proyecto Final** del curso Full Stack Web & Mobile con Inte
 
 ---
 
+## ☁️ Servicios de Google Cloud
+
+Ocho servicios del proyecto `finansync-74cd1`, región `us-central1`.
+
+| Servicio | Para qué | Dónde se ve |
+|---|---|---|
+| **Cloud Run** | Ejecuta la app en un contenedor y escala a cero cuando no hay tráfico | `Dockerfile` |
+| **Cloud Build** | Construye la imagen y despliega una revisión nueva en cada push a `main` | `cloudbuild.yaml` |
+| **Cloud Storage** | Bucket privado con las imágenes de facturas, servidas con URL firmadas | `lib/gcs.ts` |
+| **Cloud Vision** | Extrae el texto de la factura antes de llamar al modelo | `lib/vision.ts` |
+| **Vertex AI** | Gemini para el chat, las perspectivas y la lectura de facturas | `lib/vertex.ts` |
+| **Cloud Scheduler** | Dispara el estado de cuenta el día 1 de cada mes (`0 8 1 * *`) | `app/api/reportes/mensual/route.ts` |
+| **Cloud IAM** | Dos cuentas de servicio con permisos separados y ninguna llave en producción | `lib/google-auth.ts` |
+| **Cloud Logging y Monitoring** | Registros en JSON y dos políticas de alerta por correo | `monitoring/` |
+
+`finansync-runtime` llama a Vision y a Vertex AI; `finansync-storage` solo firma y sube objetos al bucket. Artifact Registry guarda las imágenes que produce Cloud Build.
+
+---
+
 ## 🚀 Stack tecnológico
 
 | Tecnología | Versión | Uso |
 |---|---|---|
-| Next.js | 15.2 | Framework principal — App Router, API Routes, SSR |
+| Next.js | 15.5 | Framework principal — App Router, API Routes, SSR |
 | React | 18.3 | UI con hooks y Context API |
 | TypeScript | 5 | Tipado estático en toda la app |
 | Tailwind CSS | 3.4 | Estilos utilitarios |
@@ -51,7 +68,7 @@ Esta es la entrega **Proyecto Final** del curso Full Stack Web & Mobile con Inte
 
 | Herramienta | Versión mínima |
 |---|---|
-| Node.js | 18.18 |
+| Node.js | 20 |
 | npm | 9 |
 
 ### 2. Clonar e instalar
@@ -234,8 +251,6 @@ El modelo sigue el diagrama entidad-relación del proyecto: cinco tablas, todas 
 
 **Qué pasa al borrar una categoría.** Las dos llaves foráneas hacia `categorias` se comportan distinto a propósito: en `transacciones` es `ON DELETE SET NULL`, así que la transacción se conserva y solo queda sin clasificar (un `CASCADE` ahí borraría el historial financiero del usuario); en `presupuestos` es `ON DELETE CASCADE`, porque un presupuesto de una categoría que ya no existe no significa nada. La pantalla de Configuración pide confirmación antes de quitar una categoría.
 
-**Cambios frente al modelo anterior de Firestore.** El `uid` suelto pasó a ser `id_usuario` con clave foránea real. El campo `tipo` dejó de ser texto libre (`INGRESO`/`GASTO`) y ahora es un enum que Postgres valida. Las dos fechas de cada transacción (`fecha` + `fechaISO`) se unificaron en una sola columna `date`. Las categorías dejaron de ser un arreglo de texto dentro del documento del usuario y son filas propias con llave foránea. Y las preferencias del usuario dejaron de ser campos sueltos en `users/{uid}` para vivir en `usuarios`, con una fila creada automáticamente por un trigger al registrarse.
-
 Las páginas siguen trabajando con nombres de categoría, no con ids: la traducción entre ambos la hace `lib/categorias.ts` y es invisible para los componentes.
 
 ---
@@ -289,7 +304,7 @@ El respaldo es 3.5 Flash, y no 3.6 o 3.7, porque esas versiones se retiran pront
 
 ## 🔐 Seguridad — Row Level Security
 
-Las reglas de Firestore se reemplazaron por políticas RLS, que Postgres aplica dentro de la propia base de datos: no importa qué consulta mande el cliente, solo puede alcanzar sus propias filas.
+Las políticas RLS las aplica Postgres dentro de la propia base de datos: no importa qué consulta mande el cliente, solo puede alcanzar sus propias filas.
 
 Las cinco tablas tienen RLS activo y una política por operación con la forma:
 
@@ -304,7 +319,7 @@ Cuatro funciones completan el esquema base:
 
 | Función | Qué hace |
 |---|---|
-| `handle_new_user()` | Trigger `after insert on auth.users`. Crea la fila de `usuarios` con el `nombre` que viene en los metadatos (o el `full_name` que manda Google) y las categorías por defecto como filas de `categorias`. Esto arregla un bug del modelo anterior: quien entraba con Google nunca obtenía documento de perfil. |
+| `handle_new_user()` | Trigger `after insert on auth.users`. Crea la fila de `usuarios` con el `nombre` que viene en los metadatos (o el `full_name` que manda Google) y las categorías por defecto como filas de `categorias`. |
 | `sincronizar_categorias_usuario()` | Trigger `after insert or update or delete on categorias`. Vuelve a armar `usuarios.categorias` para el usuario afectado. |
 | `usuarios_categorias_solo_lectura()` | Trigger `before update on usuarios`. Recalcula `usuarios.categorias` desde la tabla `categorias`, para que el campo no se pueda escribir a mano. |
 | `eliminar_mi_cuenta()` | `security definer`, así que puede borrar de `auth.users` sin exponer la `service_role` key en el navegador. Solo borra al usuario de la sesión actual (`auth.uid()`), y el `on delete cascade` arrastra categorías, transacciones, metas y presupuestos. Se llama desde Configuración con `supabase.rpc('eliminar_mi_cuenta')`. |
@@ -319,4 +334,4 @@ Además de RLS, las rutas de IA vuelven a validar la sesión en el servidor (no 
 - 📊 [`FinanSync-DiagramasProyectoFinal.pdf`](./FinanSync-DiagramasProyectoFinal.pdf) — diagramas de arquitectura, autenticación, base de datos, Gemini y navegación.
 - 📈 [`monitoring/README.md`](monitoring/README.md) — eventos registrados, alertas y consultas de Cloud Logging.
 
-> Los diagramas y la documentación PDF describen el modelo original con Firebase y Gemini 2.5. La arquitectura vigente es la descrita en este README.
+> Los dos PDF corresponden a una entrega anterior del proyecto. La arquitectura vigente es la que describe este README.
