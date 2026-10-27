@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { llamarVertex } from '@/lib/vertex'
+import { llamarVertexConRespaldo } from '@/lib/vertex'
 
 // se llama por Vertex AI y no por la API key de AI Studio: la autenticacion es
 // con la cuenta de servicio finansync-runtime, controlada por IAM
-const MODELO = 'gemini-2.5-flash'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -93,7 +92,7 @@ export async function POST(req: Request) {
 
     // systemInstruction lleva el prompt del sistema, separado del historial. en
     // Vertex el campo va en camelCase, no en snake_case como en AI Studio
-    const res = await llamarVertex(MODELO, {
+    const res = await llamarVertexConRespaldo({
       systemInstruction: { parts: [{ text: buildSystemPrompt(contexto) }] },
       contents,
     })
@@ -103,7 +102,6 @@ export async function POST(req: Request) {
       console.error('Error de Vertex AI:', err)
       return NextResponse.json({ error: 'Error al procesar tu mensaje' }, { status: 500 })
     }
-    console.log(`Vertex AI (${MODELO}): OK`)
 
     // la respuesta viene en candidates[0].content.parts[0].text
     const data = await res.json()

@@ -222,7 +222,7 @@ export default function ChatIAPage() {
           </div>
           <div>
             <h1 className="font-bold text-slate-800 dark:text-white text-lg leading-tight">FinanSync AI</h1>
-            <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400">Asesor financiero personal · Gemini 2.5 Flash</p>
+            <p className="hidden sm:block text-xs text-slate-500 dark:text-slate-400">Asesor financiero personal · Gemini 3.8 Flash</p>
           </div>
           <span className="ml-2 hidden sm:flex items-center gap-1.5">
             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />

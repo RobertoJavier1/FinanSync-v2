@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { llamarVertex } from '@/lib/vertex'
+import { llamarVertexConRespaldo } from '@/lib/vertex'
 
 // se llama por Vertex AI y no por la API key de AI Studio: la autenticacion es
 // con la cuenta de servicio finansync-runtime, controlada por IAM
-const MODELO = 'gemini-2.5-flash'
 
 export async function POST(req: Request) {
   try {
@@ -64,7 +63,7 @@ Responde ÚNICAMENTE con este JSON, sin texto adicional:
 }
 `
 
-    const res = await llamarVertex(MODELO, {
+    const res = await llamarVertexConRespaldo({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
     })
 
@@ -73,7 +72,6 @@ Responde ÚNICAMENTE con este JSON, sin texto adicional:
       console.error('Error de Vertex AI:', err)
       return NextResponse.json({ error: 'Error al generar perspectivas' }, { status: 500 })
     }
-    console.log(`Vertex AI (${MODELO}): OK`)
 
     const data = await res.json()
     const text = data.candidates[0].content.parts[0].text
