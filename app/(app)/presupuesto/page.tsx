@@ -16,11 +16,12 @@ import { useTransaccionesPorMes } from '@/hooks/useTransacciones'
 import { usePresupuestos } from '@/hooks/usePresupuestos'
 import { useQueryClient } from '@tanstack/react-query'
 import SelectorMes from '@/components/SelectorMes'
+import SelectorEmoji from '@/components/SelectorEmoji'
 
 export default function PresupuestoPage() {
   const { user } = useAuth()
   const { notif } = useNotif()
-  const { finanzas, formatear, convertir } = useFinanzas()
+  const { finanzas, formatear, convertir, guardar } = useFinanzas()
   const confirmar = useConfirmar()
   const { mes, anio, mesNombre } = usePeriodo()
 
@@ -35,6 +36,10 @@ export default function PresupuestoPage() {
 
   // campos del formulario del modal
   const [newCategoria, setNewCategoria] = useState('')
+  const [mostrarNuevaCategoria, setMostrarNuevaCategoria] = useState(false)
+  const [nuevaCategoriaInput, setNuevaCategoriaInput] = useState('')
+  const [agregandoCategoria, setAgregandoCategoria] = useState(false)
+  const [errorCategoria, setErrorCategoria] = useState('')
   const [newLimite, setNewLimite] = useState('')
   const [newColor, setNewColor] = useState(COLORES_PRESUPUESTO[0])
   const [newIcono, setNewIcono] = useState(ICONOS_PRESUPUESTO[0])
@@ -55,8 +60,39 @@ export default function PresupuestoPage() {
   const totalRemaining = totalBudget - totalSpent
   const overallProgress = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
 
+  // agrega una categoria escrita a mano (boton "+ Nueva categoria"), sin salir
+  // del modal ni pasar por Configuracion. mismo flujo que en Transacciones
+  async function handleAgregarCategoria() {
+    const nombre = nuevaCategoriaInput.trim()
+    if (!nombre) return
+    setErrorCategoria('')
+
+    // ya existe: solo la selecciona, no hace falta llamar a guardar()
+    if (finanzas.categorias.includes(nombre)) {
+      setNewCategoria(nombre)
+      setMostrarNuevaCategoria(false)
+      setNuevaCategoriaInput('')
+      return
+    }
+
+    setAgregandoCategoria(true)
+    try {
+      await guardar({ moneda: finanzas.moneda, categorias: [...finanzas.categorias, nombre] })
+      setNewCategoria(nombre)
+      setMostrarNuevaCategoria(false)
+      setNuevaCategoriaInput('')
+    } catch {
+      setErrorCategoria('No se pudo agregar la categoría')
+    } finally {
+      setAgregandoCategoria(false)
+    }
+  }
+
   function resetModal() {
     setNewCategoria('')
+    setMostrarNuevaCategoria(false)
+    setNuevaCategoriaInput('')
+    setErrorCategoria('')
     setNewLimite('')
     setNewColor(COLORES_PRESUPUESTO[0])
     setNewIcono(ICONOS_PRESUPUESTO[0])
@@ -275,6 +311,54 @@ export default function PresupuestoPage() {
                   <option value="">Selecciona una categoría</option>
                   {finanzas.categorias.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                {/* agregar una categoria nueva sin salir del modal ni ir a Configuracion */}
+                {mostrarNuevaCategoria ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={nuevaCategoriaInput}
+                      onChange={(e) => setNuevaCategoriaInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAgregarCategoria()
+                        }
+                      }}
+                      placeholder="Nombre de la categoría"
+                      autoFocus
+                      className="flex-1 min-w-0 px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAgregarCategoria}
+                      disabled={agregandoCategoria || !nuevaCategoriaInput.trim()}
+                      className="shrink-0 text-xs font-medium text-green-600 dark:text-green-400 underline disabled:opacity-50"
+                    >
+                      {agregandoCategoria ? 'Agregando...' : 'Agregar'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMostrarNuevaCategoria(false)
+                        setNuevaCategoriaInput('')
+                        setErrorCategoria('')
+                      }}
+                      aria-label="Cancelar"
+                      className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarNuevaCategoria(true)}
+                    className="mt-2 text-xs font-medium text-green-600 dark:text-green-400 hover:underline"
+                  >
+                    + Nueva categoría
+                  </button>
+                )}
+                {errorCategoria && <p className="text-xs text-red-500 mt-1">{errorCategoria}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Límite Mensual</label>
@@ -298,18 +382,7 @@ export default function PresupuestoPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Ícono</label>
-                <div className="flex gap-2 flex-wrap">
-                  {ICONOS_PRESUPUESTO.map((icono) => (
-                    <button
-                      key={icono}
-                      type="button"
-                      onClick={() => setNewIcono(icono)}
-                      className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors ${newIcono === icono ? 'bg-green-100 ring-2 ring-green-500' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
-                    >
-                      {icono}
-                    </button>
-                  ))}
-                </div>
+                <SelectorEmoji sugerencias={ICONOS_PRESUPUESTO} valor={newIcono} onChange={setNewIcono} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Color</label>

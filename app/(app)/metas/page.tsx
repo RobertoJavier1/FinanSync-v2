@@ -17,6 +17,7 @@ import {
 import { agregarTransaccion } from '@/lib/transacciones'
 import { useTransacciones } from '@/hooks/useTransacciones'
 import { useMetas } from '@/hooks/useMetas'
+import SelectorEmoji from '@/components/SelectorEmoji'
 import { useQueryClient } from '@tanstack/react-query'
 
 export default function MetasPage() {
@@ -449,18 +450,7 @@ export default function MetasPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Ícono</label>
-                <div className="flex gap-2 flex-wrap">
-                  {ICONOS_META.map((icono) => (
-                    <button
-                      key={icono}
-                      type="button"
-                      onClick={() => setNewIcono(icono)}
-                      className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-colors ${newIcono === icono ? 'bg-green-100 ring-2 ring-green-500' : 'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
-                    >
-                      {icono}
-                    </button>
-                  ))}
-                </div>
+                <SelectorEmoji sugerencias={ICONOS_META} valor={newIcono} onChange={setNewIcono} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Color</label>
