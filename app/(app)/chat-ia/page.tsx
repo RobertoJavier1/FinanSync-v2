@@ -48,9 +48,14 @@ export default function ChatIAPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // se depende del id y no del objeto user: Supabase entrega un objeto nuevo cada
+  // vez que refresca el token (pasa al volver a la pestaña), y con eso el efecto
+  // se volvia a ejecutar y borraba la conversacion
+  const userId = user?.id
+
   // carga los datos reales del usuario desde Supabase al montar
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
 
     async function cargarContexto() {
       try {
@@ -61,16 +66,16 @@ export default function ChatIAPage() {
 
         const [transacciones, presupuestos, metas] = await Promise.all([
           queryClient.fetchQuery({
-            queryKey: ['transacciones', user!.id],
-            queryFn: () => getTransacciones(user!.id),
+            queryKey: ['transacciones', userId!],
+            queryFn: () => getTransacciones(userId!),
           }),
           queryClient.fetchQuery({
-            queryKey: ['presupuestos', user!.id, mes, anio],
-            queryFn: () => getPresupuestos(user!.id, mes, anio),
+            queryKey: ['presupuestos', userId!, mes, anio],
+            queryFn: () => getPresupuestos(userId!, mes, anio),
           }),
           queryClient.fetchQuery({
-            queryKey: ['metas', user!.id],
-            queryFn: () => getMetas(user!.id),
+            queryKey: ['metas', userId!],
+            queryFn: () => getMetas(userId!),
           }),
         ])
 
@@ -129,12 +134,14 @@ export default function ChatIAPage() {
         const tieneGastos = gastosMes > 0
         const bienvenida = tieneGastos
           ? `¡Hola ${ctx.nombre}! Soy FinanSync AI. 💰\n\nYa cargué tu información financiera de ${mesStr} (${finanzas.moneda}):\n• Ingresos: ${ingresosMes.toFixed(2)} ${finanzas.moneda}\n• Gastos: ${gastosMes.toFixed(2)} ${finanzas.moneda}\n• Balance: ${(ingresosMes - gastosMes).toFixed(2)} ${finanzas.moneda}\n\nPuedes preguntarme sobre tus gastos, presupuestos, metas o pedirme consejos personalizados. ¿En qué te ayudo?`
-          : `¡Hola ${ctx.nombre}! Soy FinanSync AI. 💰\n\nTodavía no tienes transacciones registradas este mes, pero puedo ayudarte con consejos financieros generales o explicarte cómo usar FinanSync al máximo. ¿Qué quieres saber?`
+          : `¡Hola ${ctx.nombre}! Soy FinanSync AI. 💰\n\nTodavía no tienes transacciones registradas este mes, pero puedo ayudarte con consejos financieros generales. ¿Qué quieres saber?`
 
-        setMessages([{ role: 'assistant', content: bienvenida }])
+        // si el contexto se recarga con una conversacion en curso (ej. cambio de
+        // moneda) se conserva; solo se reemplaza cuando no hay mas que la bienvenida
+        setMessages((prev) => prev.length > 1 ? prev : [{ role: 'assistant', content: bienvenida }])
       } catch (err) {
         console.error('Error cargando contexto:', err)
-        setMessages([{
+        setMessages((prev) => prev.length > 1 ? prev : [{
           role: 'assistant',
           content: '¡Hola! Soy FinanSync AI. No pude cargar tus datos en este momento, pero puedo ayudarte con consejos financieros generales. ¿En qué te ayudo?',
         }])
@@ -144,7 +151,7 @@ export default function ChatIAPage() {
     }
 
     cargarContexto()
-  }, [user, convertir, finanzas.moneda])
+  }, [userId, convertir, finanzas.moneda])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

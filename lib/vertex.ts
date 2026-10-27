@@ -28,8 +28,10 @@ const LOCATION = process.env.VERTEX_LOCATION || 'global'
 export const MODELOS_GEMINI = ['gemini-3.8-flash', 'gemini-3.5-flash'] as const
 
 // tiempo maximo por intento. sin esto una peticion saturada llego a tardar 69 s
-// en devolver el 429; es mejor cortar y pasar al siguiente modelo
-const TIEMPO_LIMITE_MS = 25_000
+// en devolver el 429; es mejor cortar y pasar al siguiente modelo. no se pone
+// mas bajo porque con el modelo saturado hubo respuestas validas de 20-23 s, y
+// cortarlas obliga a pagar otra llamada
+const TIEMPO_LIMITE_MS = 45_000
 
 // el cliente de auth guarda el token en memoria y solo lo renueva cuando
 // expira, así que conviene crearlo una vez y reutilizarlo entre peticiones
@@ -102,6 +104,7 @@ export async function llamarVertexConRespaldo(
   for (const modelo of modelos) {
     for (let intento = 1; intento <= 2; intento++) {
       let respuesta: Response
+      const inicio = Date.now()
       try {
         respuesta = await llamarVertex(modelo, body, AbortSignal.timeout(TIEMPO_LIMITE_MS))
       } catch (error) {
@@ -114,7 +117,14 @@ export async function llamarVertexConRespaldo(
       }
 
       if (respuesta.ok) {
-        console.log(`Vertex AI (${modelo}): OK`)
+        // se lee una copia para no consumir el body que va a leer el caller. el
+        // detalle de tokens sirve para ver si la latencia viene del thinking
+        const uso = (await respuesta.clone().json().catch(() => null))?.usageMetadata
+        console.log(
+          `Vertex AI (${modelo}): OK en ${((Date.now() - inicio) / 1000).toFixed(1)} s` +
+          ` | tokens entrada=${uso?.promptTokenCount ?? '?'}` +
+          ` pensamiento=${uso?.thoughtsTokenCount ?? 0} salida=${uso?.candidatesTokenCount ?? '?'}`,
+        )
         return respuesta
       }
       ultimaRespuesta = respuesta
