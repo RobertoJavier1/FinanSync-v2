@@ -6,19 +6,19 @@ Los datos viven en cinco tablas de Postgres con Row Level Security y el esquema 
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
 **[https://finansync.me](https://finansync.me)** — desplegada en Google Cloud Run con dominio propio.
 
 ---
 
-## 🎬 Video demo
+## Video demo
 
 **[https://youtu.be/jUmD25vVK48](https://youtu.be/jUmD25vVK48)**
 
 ---
 
-## ☁️ Servicios de Google Cloud
+## Servicios de Google Cloud
 
 Ocho servicios del proyecto `finansync-74cd1`, región `us-central1`.
 
@@ -37,7 +37,7 @@ Ocho servicios del proyecto `finansync-74cd1`, región `us-central1`.
 
 ---
 
-## 🚀 Stack tecnológico
+## Stack tecnológico
 
 | Tecnología | Versión | Uso |
 |---|---|---|
@@ -62,7 +62,7 @@ Ocho servicios del proyecto `finansync-74cd1`, región `us-central1`.
 
 ---
 
-## ⚙️ Configuración local
+## Configuración local
 
 ### 1. Requisitos previos
 
@@ -137,7 +137,7 @@ npm start
 
 ---
 
-## 📱 Pantallas implementadas
+## Pantallas implementadas
 
 | Pantalla | Ruta | Descripción |
 |---|---|---|
@@ -157,7 +157,7 @@ Todas las acciones de borrado (transacciones, presupuestos, metas, categorías y
 
 ---
 
-## 🗂️ Estructura del proyecto
+## Estructura del proyecto
 
 ```
 FinanSync-v2/
@@ -229,7 +229,7 @@ FinanSync-v2/
 
 ---
 
-## 🗄️ Estructura de datos en Postgres
+## Estructura de datos en Postgres
 
 El modelo sigue el diagrama entidad-relación del proyecto: cinco tablas, todas colgando del usuario con `ON DELETE CASCADE`, así que borrar una cuenta arrastra todos sus datos.
 
@@ -255,7 +255,7 @@ Las páginas siguen trabajando con nombres de categoría, no con ids: la traducc
 
 ---
 
-## 💱 Conversión de monedas
+## Conversión de monedas
 
 El endpoint `/api/tipo-cambio` consulta la API pública de jsDelivr y cachea las tasas en memoria por 24 horas. Cada transacción guarda su `monedaOrigen` y se convierte al renderizar — el histórico permanece fiel y las tasas frescas se aplican siempre.
 
@@ -263,7 +263,7 @@ El endpoint `/api/tipo-cambio` consulta la API pública de jsDelivr y cachea las
 
 ---
 
-## 🤖 Integración con Gemini
+## Integración con Gemini
 
 Las tres funciones de IA (`/api/chat`, `/api/perspectivas` y `/api/facturas`) llaman a Gemini por **Vertex AI**, no por la API key de Google AI Studio. La autenticación la hace la cuenta de servicio `finansync-runtime` con un token OAuth de corta duración, de modo que el acceso se controla con IAM y puede revocarse sin tocar el código. Todo pasa por `lib/vertex.ts`.
 
@@ -286,7 +286,7 @@ El respaldo es 3.5 Flash, y no 3.6 o 3.7, porque esas versiones se retiran pront
 
 ---
 
-## 📊 Reportes y estado de cuenta mensual
+## Reportes y estado de cuenta mensual
 
 **Reportes** (`/reportes`) usa dos funciones SQL de `0003_reportes.sql` (`reporte_comparativa_mensual` y `reporte_promedio_categoria`) que agrupan y suman en Postgres en vez de traer todas las filas. Son `security invoker` con `auth.uid()`, así que las mismas políticas RLS las protegen. El PDF se dibuja en el navegador con jsPDF a partir de los datos ya calculados, no como captura de pantalla.
 
@@ -294,7 +294,7 @@ El respaldo es 3.5 Flash, y no 3.6 o 3.7, porque esas versiones se retiran pront
 
 ---
 
-## ☁️ Despliegue y operación
+## Despliegue y operación
 
 - **Cloud Build** — el trigger `deploy-main` construye la imagen (`Dockerfile`) con cada push a `main`, la sube a Artifact Registry y despliega en **Cloud Run** (`us-central1`), según `cloudbuild.yaml`.
 - **Dominio** — `finansync.me` mapeado al servicio de Cloud Run.
@@ -302,7 +302,7 @@ El respaldo es 3.5 Flash, y no 3.6 o 3.7, porque esas versiones se retiran pront
 
 ---
 
-## 🔐 Seguridad — Row Level Security
+## Seguridad — Row Level Security
 
 Las políticas RLS las aplica Postgres dentro de la propia base de datos: no importa qué consulta mande el cliente, solo puede alcanzar sus propias filas.
 
@@ -328,10 +328,10 @@ Además de RLS, las rutas de IA vuelven a validar la sesión en el servidor (no 
 
 ---
 
-## 📄 Documentación adicional
+## Documentación adicional
 
-- 📘 [`FinanSync-DocumentaciónFinal.pdf`](./FinanSync-DocumentaciónFinal.pdf) — documentación completa de la entrega final.
-- 📊 [`FinanSync-DiagramasProyectoFinal.pdf`](./FinanSync-DiagramasProyectoFinal.pdf) — diagramas de arquitectura, autenticación, base de datos, Gemini y navegación.
-- 📈 [`monitoring/README.md`](monitoring/README.md) — eventos registrados, alertas y consultas de Cloud Logging.
+- [`FinanSync-DocumentaciónFinal.pdf`](./FinanSync-DocumentaciónFinal.pdf) — documentación completa de la entrega final.
+- [`FinanSync-DiagramasProyectoFinal.pdf`](./FinanSync-DiagramasProyectoFinal.pdf) — diagramas de arquitectura, autenticación, base de datos, Gemini y navegación.
+- [`monitoring/README.md`](monitoring/README.md) — eventos registrados, alertas y consultas de Cloud Logging.
 
 > Los dos PDF corresponden a una entrega anterior del proyecto. La arquitectura vigente es la que describe este README.
