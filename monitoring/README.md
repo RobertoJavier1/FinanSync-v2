@@ -40,8 +40,12 @@ token de cualquier cuenta de Google. En Cloud Run se configura así:
 
 ```bash
 gcloud run services update finansync --region=us-central1 \
-  --update-env-vars="REPORTE_SERVICE_ACCOUNT=finansync-runtime@finansync-74cd1.iam.gserviceaccount.com"
+  --update-env-vars="REPORTE_SERVICE_ACCOUNT=finansync-scheduler@finansync-74cd1.iam.gserviceaccount.com"
 ```
+
+`finansync-scheduler` es una cuenta aparte, usada solo por el job. Tiene el rol
+*Invocador de Cloud Run* únicamente sobre el servicio `finansync`, no sobre el
+proyecto, y la app no puede firmar tokens a su nombre.
 
 Después conviene forzar una ejecución del job `estado-cuenta-mensual` desde
 Cloud Scheduler: tiene que seguir terminando sin errores.

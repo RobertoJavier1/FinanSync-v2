@@ -30,10 +30,19 @@ Ocho servicios del proyecto `finansync-74cd1`, región `us-central1`.
 | **Cloud Vision** | Extrae el texto de la factura antes de llamar al modelo | `lib/vision.ts` |
 | **Vertex AI** | Gemini para el chat, las perspectivas y la lectura de facturas | `lib/vertex.ts` |
 | **Cloud Scheduler** | Dispara el estado de cuenta el día 1 de cada mes (`0 8 1 * *`) | `app/api/reportes/mensual/route.ts` |
-| **Cloud IAM** | Dos cuentas de servicio con permisos separados y ninguna llave en producción | `lib/google-auth.ts` |
+| **Cloud IAM** | Una cuenta de servicio por tarea, con permisos acotados y ninguna llave en producción | `lib/google-auth.ts` |
 | **Cloud Logging y Monitoring** | Registros en JSON y dos políticas de alerta por correo | `monitoring/` |
 
-`finansync-runtime` llama a Vision y a Vertex AI; `finansync-storage` solo firma y sube objetos al bucket. Artifact Registry guarda las imágenes que produce Cloud Build.
+Cada servicio corre con su propia cuenta y solo con los permisos que necesita:
+
+| Cuenta | La usa | Permisos |
+|---|---|---|
+| `finansync-runtime` | Cloud Run (la app) | Vertex AI, Storage solo sobre el bucket `finansync-facturas`, escribir logs y métricas |
+| `finansync-scheduler` | Cloud Scheduler | Invocar solo el servicio `finansync` |
+| `finansync-deployer` | Cloud Build | Desplegar revisiones en Cloud Run |
+| `finansync-storage` | Desarrollo local | Storage solo sobre el bucket `finansync-facturas` |
+
+Ningún permiso está dado a nivel de proyecto si se puede dar sobre el recurso. Artifact Registry guarda las imágenes que produce Cloud Build.
 
 ---
 

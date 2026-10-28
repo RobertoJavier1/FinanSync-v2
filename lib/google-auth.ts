@@ -1,12 +1,15 @@
 // Credenciales de la cuenta de servicio de runtime (finansync-runtime).
 //
-// El proyecto usa dos cuentas de servicio distintas a propósito, siguiendo el
-// principio de menor privilegio de IAM:
+// El proyecto usa una cuenta de servicio por tarea, siguiendo el principio de
+// menor privilegio de IAM (detalle en el README):
 //
-//   finansync-storage  -> solo Cloud Storage, para subir y firmar las imágenes
-//                         de facturas (lib/gcs.ts)
-//   finansync-runtime  -> las APIs de IA: Cloud Vision y Vertex AI
-//                         (lib/vision.ts y lib/vertex.ts)
+//   finansync-runtime    -> identidad de Cloud Run: Cloud Vision, Vertex AI
+//                           (lib/vision.ts y lib/vertex.ts) y el bucket de
+//                           facturas (lib/gcs.ts)
+//   finansync-scheduler  -> solo la usa Cloud Scheduler para invocar el job
+//                           mensual
+//   finansync-storage    -> solo en desarrollo local, para el bucket de
+//                           facturas
 //
 // Hay dos formas de autenticarse, y el módulo elige sola la que corresponde:
 //

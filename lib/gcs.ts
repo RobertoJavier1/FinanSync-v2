@@ -7,7 +7,9 @@
 // Usa la cuenta de servicio finansync-storage vía las variables GCS_* solo si
 // están configuradas (desarrollo local). Si no, cae a las Application Default
 // Credentials del entorno: en Cloud Run, la identidad asignada al servicio
-// (finansync-runtime, que ya tiene el rol Storage Object Admin).
+// (finansync-runtime). Las dos cuentas tienen el rol Storage Object Admin solo
+// sobre el bucket de facturas, no sobre el proyecto: no alcanzan ningún otro
+// bucket.
 import { Storage, Bucket } from '@google-cloud/storage'
 
 // el cliente y el bucket se crean la primera vez que hace falta, no al cargar
