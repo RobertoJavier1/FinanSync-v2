@@ -339,8 +339,4 @@ Además de RLS, las rutas de IA vuelven a validar la sesión en el servidor (no 
 
 ## Documentación adicional
 
-- [`FinanSync-DocumentaciónFinal.pdf`](./FinanSync-DocumentaciónFinal.pdf) — documentación completa de la entrega final.
-- [`FinanSync-DiagramasProyectoFinal.pdf`](./FinanSync-DiagramasProyectoFinal.pdf) — diagramas de arquitectura, autenticación, base de datos, Gemini y navegación.
 - [`monitoring/README.md`](monitoring/README.md) — eventos registrados, alertas y consultas de Cloud Logging.
-
-> Los dos PDF corresponden a una entrega anterior del proyecto. La arquitectura vigente es la que describe este README.
