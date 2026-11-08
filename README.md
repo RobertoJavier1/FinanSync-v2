@@ -14,7 +14,7 @@ Los datos viven en cinco tablas de Postgres con Row Level Security y el esquema 
 
 ## Video demo
 
-**[https://youtu.be/jUmD25vVK48](https://youtu.be/jUmD25vVK48)**
+**[https://www.youtube.com/watch?v=NpCvoWSodEU)**
 
 ---
 
